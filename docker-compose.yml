@@ -1,0 +1,58 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-gymbot}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-gymbot}
+      POSTGRES_DB: ${POSTGRES_DB:-gymbot}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    # Раскомментируйте для прямого доступа к БД с хоста (CLI, IDE, миграции)
+    # ports:
+    #   - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-gymbot} -d ${POSTGRES_DB:-gymbot}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  pgadmin:
+    image: dpage/pgadmin4:8.14
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-admin@example.com}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:-change-me}
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+      # Подхватывать servers.json при каждом старте (удобно при смене учётки БД в pgpass)
+      PGADMIN_REPLACE_SERVERS_ON_STARTUP: "True"
+      PGADMIN_SERVER_JSON_FILE: /pgadmin4/servers.json
+      PGPASS_FILE: /pgadmin4/pgpass
+    ports:
+      - "${PGADMIN_PORT:-5050}:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+      - ./docker/pgadmin/servers.json:/pgadmin4/servers.json:ro
+      - ./docker/pgadmin/pgpass:/pgadmin4/pgpass:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  bot:
+    build: .
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://gymbot:gymbot@db:5432/gymbot}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:?set TELEGRAM_BOT_TOKEN in .env}
+      EXTERNAL_API_BASE_URL: ${EXTERNAL_API_BASE_URL:-http://host.docker.internal:8080}
+      EXTERNAL_API_KEY: ${EXTERNAL_API_KEY:-}
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  pgadmin_data:
