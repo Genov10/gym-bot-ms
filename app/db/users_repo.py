@@ -26,3 +26,15 @@ async def register_or_update(
     await session.commit()
     await session.refresh(user)
     return user
+
+
+async def set_phone_number(session: AsyncSession, *, telegram_id: int, phone_number: str) -> User:
+    user = await get_by_telegram_id(session, telegram_id)
+    if user is None:
+        user = User(telegram_id=telegram_id, phone_number=phone_number)
+        session.add(user)
+    else:
+        user.phone_number = phone_number
+    await session.commit()
+    await session.refresh(user)
+    return user
