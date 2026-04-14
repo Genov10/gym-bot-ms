@@ -7,7 +7,7 @@ from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 
 from app.config import settings
-from app.db import init_db
+from app.db.migrate import upgrade_head
 from app.handlers import setup_routers
 from app.middlewares import ApiMiddleware
 from app.services.external_api import ExternalApiClient
@@ -21,7 +21,8 @@ logger = logging.getLogger(__name__)
 
 
 async def main() -> None:
-    await init_db()
+    # Auto-apply DB migrations on startup
+    await asyncio.to_thread(upgrade_head)
     api = ExternalApiClient()
     bot = Bot(token=settings.telegram_bot_token, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
     dp = Dispatcher()
