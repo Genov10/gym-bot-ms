@@ -20,6 +20,31 @@ from app.services.service_catalog import list_services_mock
 logger = logging.getLogger(__name__)
 router = Router(name="start")
 
+HOME_BUTTON_TEXT = "🏠 Головне меню"
+
+MENU_KB = InlineKeyboardMarkup(
+    inline_keyboard=[
+        [
+            InlineKeyboardButton(text="Реєстрація", callback_data="action:register"),
+            InlineKeyboardButton(text="Каталог", callback_data="action:catalog"),
+        ]
+    ]
+)
+
+def _home_kb() -> ReplyKeyboardMarkup:
+    return ReplyKeyboardMarkup(
+        keyboard=[[KeyboardButton(text=HOME_BUTTON_TEXT)]],
+        resize_keyboard=True,
+        one_time_keyboard=False,
+        input_field_placeholder="Обери дію",
+    )
+
+
+async def _send_menu(message: Message, text: str) -> None:
+    await message.answer(text, reply_markup=MENU_KB)
+    # Постоянная кнопка под полем ввода
+    await message.answer("", reply_markup=_home_kb())
+
 
 async def _send_catalog(message: Message) -> None:
     services = await list_services_mock()
@@ -63,15 +88,20 @@ async def cmd_start(message: Message, api: ExternalApiClient) -> None:
     except Exception:
         logger.exception("external API upsert failed for telegram_id=%s", u.id)
 
-    kb = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(text="Реєстрація", callback_data="action:register"),
-                InlineKeyboardButton(text="Каталог", callback_data="action:catalog"),
-            ]
-        ]
+    await _send_menu(
+        message,
+        f"Привіт, {user.first_name or 'атлет'}! Я твій помічник у залі. Чи можу допомогти?",
     )
-    await message.answer("Привіт! Чим можу допомогти?", reply_markup=kb)
+
+
+@router.message(Command("menu"))
+async def cmd_menu(message: Message) -> None:
+    await _send_menu(message, "Чим можу допомогти?")
+
+
+@router.message(F.text == HOME_BUTTON_TEXT)
+async def home_button(message: Message) -> None:
+    await _send_menu(message, "Чим можу допомогти?")
 
 
 @router.callback_query(F.data == "action:register")
@@ -93,6 +123,7 @@ async def action_register(callback: CallbackQuery) -> None:
 async def action_catalog(callback: CallbackQuery) -> None:
     await callback.answer()
     await _send_catalog(callback.message)
+    await callback.message.answer("🏠 Головне меню доступне нижче.", reply_markup=_home_kb())
 
 
 @router.message(F.contact)
@@ -106,12 +137,13 @@ async def got_contact(message: Message) -> None:
         async with async_session_factory() as session:
             await set_phone_number(session, telegram_id=tg_id, phone_number=phone)
     await message.answer("Дякую! Номер отримано.", reply_markup=ReplyKeyboardRemove())
-    await message.answer("Чим можу допомогти? Відкрий каталог: /catalog")
+    await _send_menu(message, "Чим можу допомогти?")
 
 
 @router.message(Command("catalog"))
 async def cmd_catalog(message: Message) -> None:
     await _send_catalog(message)
+    await message.answer("🏠 Головне меню доступне нижче.", reply_markup=_home_kb())
 
 
 @router.callback_query(F.data.startswith("service:"))
