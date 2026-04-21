@@ -43,7 +43,7 @@ def _home_kb() -> ReplyKeyboardMarkup:
 async def _send_menu(message: Message, text: str) -> None:
     await message.answer(text, reply_markup=MENU_KB)
     # Постоянная кнопка под полем ввода
-    await message.answer("", reply_markup=_home_kb())
+    await message.answer("🏠 Головне меню доступне нижче.", reply_markup=_home_kb())
 
 
 async def _send_catalog(message: Message) -> None:
