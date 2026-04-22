@@ -14,12 +14,10 @@ class ServiceItem:
     price_uah: int
 
 
-async def list_services_mock() -> list[ServiceItem]:
+async def get_service_catalog() -> list[ServiceItem] | None:
     """
-    Временная реализация каталога услуг.
-
-    Сейчас: пытаемся получить услуги с внешнего API, а если оно недоступно/формат неожиданный —
-    возвращаем мок.
+    Сейчас: пытаемся получить услуги с внешнего API.
+    Если API недоступно/формат неожиданный/услуг нет — возвращаем None.
     """
     url = settings.external_api_base_url.rstrip("/") + "/api/gym-services"
     try:

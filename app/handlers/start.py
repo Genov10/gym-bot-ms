@@ -15,7 +15,7 @@ from aiogram.types import (
 from app.db.session import async_session_factory
 from app.db.users_repo import register_or_update, set_phone_number
 from app.services.external_api import ExternalApiClient
-from app.services.service_catalog import list_services_mock
+from app.services.service_catalog import get_service_catalog
 
 logger = logging.getLogger(__name__)
 router = Router(name="start")
@@ -47,7 +47,7 @@ async def _send_menu(message: Message, text: str) -> None:
 
 
 async def _send_catalog(message: Message) -> None:
-    services = await list_services_mock()
+    services = await get_service_catalog()
     kb = InlineKeyboardMarkup(
         inline_keyboard=[
             [
@@ -152,7 +152,7 @@ async def choose_service(callback: CallbackQuery) -> None:
         return
     code = callback.data.split("service:", 1)[1]
 
-    services = await list_services_mock()
+    services = await get_service_catalog()
     chosen = next((s for s in services if s.code == code), None)
     if chosen is None:
         await callback.answer("Послуга не знайдена", show_alert=True)
