@@ -5,6 +5,7 @@ import sys
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
+from aiogram.fsm.storage.memory import MemoryStorage
 
 from app.config import settings
 from app.db.migrate import upgrade_head
@@ -25,7 +26,7 @@ async def main() -> None:
     await asyncio.to_thread(upgrade_head)
     api = ExternalApiClient()
     bot = Bot(token=settings.telegram_bot_token, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
-    dp = Dispatcher()
+    dp = Dispatcher(storage=MemoryStorage())
     dp.update.middleware(ApiMiddleware(api))
     dp.include_router(setup_routers())
 
