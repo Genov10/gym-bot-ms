@@ -105,7 +105,7 @@ async def finish_training(message: Message) -> None:
         await clear_active_visit(session, telegram_id=message.from_user.id)
 
     await message.answer("Тренування завершено. До зустрічі!", reply_markup=ReplyKeyboardRemove())
-    await send_menu(message, "", telegram_id=message.from_user.id)
+    await send_menu(message, "Чим можу допомогти?", telegram_id=message.from_user.id)
 
 
 @router.message(F.text == FINISH_WORKOUT_TEXT)
@@ -137,7 +137,7 @@ async def finish_training_inline(callback: CallbackQuery) -> None:
         await clear_active_visit(session, telegram_id=callback.from_user.id)
 
     await callback.message.answer("Тренування завершено. До зустрічі!")
-    await send_menu(callback.message, "", telegram_id=callback.from_user.id)
+    await send_menu(callback.message, "Чим можу допомогти?", telegram_id=callback.from_user.id)
 
 
 @router.callback_query(F.data.startswith("customer_service:"))
