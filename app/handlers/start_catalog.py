@@ -108,19 +108,18 @@ async def order_confirm_yes(callback: CallbackQuery) -> None:
         await callback.message.answer(order_result.message or "Не вдалося створити замовлення.")
         return
 
-    # Mock payment flow for now
-    await callback.message.answer("Посилання на оплату: <b>https://pay.example/checkout</b>")
-    await callback.message.answer("Оплату отримано. Дякуємо!")
+    if not order_result.payment_url:
+        await callback.message.answer("Замовлення створено, але посилання на оплату не отримано.")
+        return
 
-    kb = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(text=START_TRAINING_TEXT, callback_data="action:visit"),
-                InlineKeyboardButton(text=MENU_TEXT, callback_data="menu:open"),
+    await callback.message.answer(
+        "Замовлення створено. Натисни кнопку нижче, щоб перейти до оплати.",
+        reply_markup=InlineKeyboardMarkup(
+            inline_keyboard=[
+                [InlineKeyboardButton(text="Оплатити", url=order_result.payment_url)],
             ]
-        ]
+        ),
     )
-    await callback.message.answer("Що робимо далі?", reply_markup=kb)
 
 
 @router.callback_query(F.data == "menu:open")

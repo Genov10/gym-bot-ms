@@ -15,6 +15,7 @@ logger = logging.getLogger(__name__)
 class CreateOrderResult:
     success: bool
     message: str | None = None
+    payment_url: str | None = None
     data: dict[str, Any] | None = None
 
 
@@ -28,10 +29,13 @@ async def create_order(*, telegram_id: int, service_id: int) -> CreateOrderResul
             payload: Any = r.json()
 
         if isinstance(payload, dict) and "success" in payload:
+            data = payload.get("data") if isinstance(payload.get("data"), dict) else payload
+            payment_url = data.get("url") if isinstance(data.get("url"), str) else None
             return CreateOrderResult(
                 success=bool(payload.get("success")),
                 message=payload.get("message"),
-                data=payload.get("data") if isinstance(payload.get("data"), dict) else None,
+                payment_url=payment_url,
+                data=data,
             )
 
         return CreateOrderResult(success=True, data=payload if isinstance(payload, dict) else None)

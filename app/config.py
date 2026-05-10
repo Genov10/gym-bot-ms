@@ -11,5 +11,9 @@ class Settings(BaseSettings):
     external_api_key: str | None = None
     external_api_timeout_sec: float = 30.0
 
+    # HTTP endpoint for inbound triggers (e.g. broadcast)
+    bot_http_host: str = "0.0.0.0"
+    bot_http_port: int = 8082
+
 
 settings = Settings()
