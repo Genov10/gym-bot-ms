@@ -1,0 +1,5 @@
+# Always check out shell scripts and Linux config files with LF
+# (otherwise pgAdmin/Postgres mis-parse pgpass on Windows hosts).
+*.sh           text eol=lf
+docker/pgadmin/pgpass   text eol=lf
+docker/pgadmin/*.json   text eol=lf
