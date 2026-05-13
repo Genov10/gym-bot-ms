@@ -1,7 +1,7 @@
 """Add phone_number and is_verified to users.
 
 Revision ID: 20260413_add_phone_and_verified
-Revises: 
+Revises: 20260401_create_users
 Create Date: 2026-04-13
 """
 
@@ -11,7 +11,7 @@ from alembic import op
 import sqlalchemy as sa
 
 revision: str = "20260413_add_phone_and_verified"
-down_revision: str | None = None
+down_revision: str | None = "20260401_create_users"
 branch_labels = None
 depends_on = None
 
