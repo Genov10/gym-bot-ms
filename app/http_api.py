@@ -39,10 +39,10 @@ def _payment_result_message(*, success: bool, service_name: str) -> str:
         name = html.escape(service_name)
         return (
             "✅ Оплата пройшла успішно\n"
-            f"Ваша послуга \"{name}\" активна \n"
-            f" Вона доспупна у каталозі ваших послуг."
+            f"  Ваша послуга \"{name}\" активна \n"
+            f"  Вона доспупна у каталозі ваших послуг"
         )
-    return "❌ Оплата не пройшла, спробуйте ще раз."
+    return "❌ Оплата не пройшла, спробуйте ще раз"
 
 
 def create_http_app(*, bot: Bot) -> FastAPI:
