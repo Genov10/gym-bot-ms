@@ -39,7 +39,7 @@ def _payment_result_message(*, success: bool, service_name: str) -> str:
         name = html.escape(service_name)
         return (
             "✅ Оплата пройшла успішно\n"
-            f"Ваша послуга {name} активна. Вона доспупна у каталозі ваших послуг."
+            f"Ваша послуга {name} активна \n Вона доспупна у каталозі ваших послуг."
         )
     return "❌ Оплата не пройшла, спробуйте ще раз."
 
