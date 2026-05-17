@@ -29,6 +29,8 @@ class RegisterCustomerResult:
 async def register_customer(
     telegram_id: int,
     name: str,
+    last_name: str,
+    username: str,
     phone: str,
     sex: str | None = None,
     email: str | None = None,
@@ -42,6 +44,8 @@ async def register_customer(
                 params={
                     "telegram_id": telegram_id,
                     "name": name,
+                    "last_name": last_name,
+                    "username": username,
                     "phone": phone,
                     "sex": sex,
                     "email": email,
