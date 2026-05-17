@@ -22,6 +22,7 @@ from app.db.users_repo import clear_active_visit, clear_active_visit_if_expired,
 from app.handlers.start_menu import send_menu
 from app.handlers.start_common import FINISH_WORKOUT_TEXT, MY_WORKOUTS_TEXT
 from app.services.service_visit import finish_visit, get_service_visit, start_visit
+from app.telegram_sensitive import SPOILER_PHOTO_KWARGS
 
 router = Router(name="start_visit")
 
@@ -164,7 +165,8 @@ async def customer_service_chosen(callback: CallbackQuery) -> None:
 
     await callback.message.answer_photo(
         BufferedInputFile(png, filename="visit.png"),
-        caption="Ось твій QR-код для входу.",
+        caption="Ось твій QR-код для входу. Натисни на зображення, щоб показати код.",
         reply_markup=_finish_visit_kb(),
+        **SPOILER_PHOTO_KWARGS,
     )
 

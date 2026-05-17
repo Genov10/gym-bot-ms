@@ -8,6 +8,8 @@ from aiogram import Bot
 from fastapi import FastAPI
 from pydantic import AliasChoices, BaseModel, Field
 
+from app.telegram_sensitive import PROTECT_CONTENT_KWARGS
+
 logger = logging.getLogger(__name__)
 
 
@@ -55,6 +57,7 @@ def create_http_app(*, bot: Bot) -> FastAPI:
             await bot.send_message(
                 body.telegram_id,
                 _payment_result_message(success=body.success, service_name=body.service_name),
+                **PROTECT_CONTENT_KWARGS,
             )
             return PaymentResultResponse(ok=True)
         except Exception as e:
@@ -72,6 +75,7 @@ def create_http_app(*, bot: Bot) -> FastAPI:
                 await bot.send_message(
                     it.telegram_id,
                     f"Нагадування: у вас закінчується абонемент на послугу (service_id={it.service_id}).",
+                    **PROTECT_CONTENT_KWARGS,
                 )
                 sent += 1
             except Exception as e:
