@@ -15,7 +15,13 @@ logger = logging.getLogger(__name__)
 router = Router(name="start_menu")
 
 
-async def send_menu(message: Message, text: str, *, telegram_id: int | None = None) -> None:
+async def send_menu(
+    message: Message,
+    text: str,
+    *,
+    telegram_id: int | None = None,
+    is_registered: bool | None = None,
+) -> None:
     if telegram_id is None:
         if message.from_user is None:
             return
@@ -24,7 +30,7 @@ async def send_menu(message: Message, text: str, *, telegram_id: int | None = No
     async with async_session_factory() as session:
         await clear_active_visit_if_expired(session, telegram_id=telegram_id)
         user = await get_by_telegram_id(session, telegram_id)
-        registered = user is not None and user.is_verified
+        registered = is_registered if is_registered is not None else (user is not None and user.is_verified)
         active = await is_active_visit(session, telegram_id=telegram_id)
 
     await message.answer(text, reply_markup=menu_kb(is_registered=registered, has_active_visit=active))

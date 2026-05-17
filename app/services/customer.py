@@ -28,28 +28,40 @@ class RegisterCustomerResult:
 
 async def register_customer(
     telegram_id: int,
-    name: str,
-    last_name: str,
-    username: str,
+    *,
+    first_name: str,
+    lastname: str,
     phone: str,
+    username: str | None = None,
     sex: str | None = None,
     email: str | None = None,
     birth_date: date | None = None,
 ) -> RegisterCustomerResult:
+    """Register customer on gym-core-ms (GET /api/gym-register-customer).
+
+    Backend expects: name, lastname, username, sex, telegram_id, phone, email.
+    Note: birth_date is collected in the bot but not stored by the API yet.
+    """
     url = settings.external_api_base_url.rstrip("/") + "/api/gym-register-customer"
-    params = {
-        "telegram_id": telegram_id,
-        "name": name,
-        "last_name": last_name,
-        "username": username,
+    params: dict[str, str] = {
+        "telegram_id": str(telegram_id),
+        "name": first_name,
+        "lastname": lastname,
         "phone": phone,
-        "sex": sex,
-        "email": email,
-        "birth_date": birth_date.isoformat() if birth_date else None,
     }
-    params = {k: v for k, v in params.items() if v is not None}
+    if username:
+        params["username"] = username.lstrip("@")
+    if sex:
+        params["sex"] = sex
+    if email:
+        params["email"] = email
+
+    if birth_date is not None:
+        logger.debug("birth_date=%s is not sent to gym-register-customer (API has no field)", birth_date)
+
     try:
         async with httpx.AsyncClient(timeout=settings.external_api_timeout_sec) as client:
+            logger.info("Register customer request telegram_id=%s params_keys=%s", telegram_id, sorted(params))
             r = await client.get(url, params=params)
             r.raise_for_status()
             payload = r.json()

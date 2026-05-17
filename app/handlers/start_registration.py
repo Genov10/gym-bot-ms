@@ -21,6 +21,13 @@ router = Router(name="start_registration")
 SKIP_EMAIL_TEXT = "Не вказувати"
 _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", re.IGNORECASE)
 
+REGISTRATION_SUCCESS_TEXT = (
+    "Дякую! Реєстрація завершена.\n\n"
+    "Тепер ви можете користуватися ботом.\n\n"
+    "У каталозі ви можете побачити доступні послуги та обрати потрібну вам.\n\n"
+    "У списку «Мої тренування» — активні абонементи та старт тренування."
+)
+
 
 def _is_valid_name_part(part: str) -> bool:
     if len(part) < 2:
@@ -65,19 +72,19 @@ async def _finish_registration(message: Message, state: FSMContext, *, email: st
 
     data = await state.get_data()
     phone = data.get("phone")
-    name = data.get("name")
-    last_name = data.get("last_name")
-    if not phone or not name or not last_name:
+    first_name = data.get("first_name") or data.get("name")
+    lastname = data.get("lastname") or data.get("last_name")
+    if not phone or not first_name or not lastname:
         await message.answer("Не вдалося завершити реєстрацію. Спробуйте ще раз з «Почати».")
         await state.clear()
         return
 
     result = await register_customer(
-        telegram_id=message.from_user.id,
-        name=name,
-        last_name=last_name,
-        username=message.from_user.username or "",
+        message.from_user.id,
+        first_name=first_name,
+        lastname=lastname,
         phone=phone,
+        username=message.from_user.username,
         sex=data.get("sex"),
         email=email,
         birth_date=data.get("birth_date"),
@@ -92,15 +99,23 @@ async def _finish_registration(message: Message, state: FSMContext, *, email: st
                 session,
                 telegram_id=message.from_user.id,
                 phone_number=phone,
-                first_name=name,
+                first_name=first_name,
             )
+        await state.clear()
+        menu_text = REGISTRATION_SUCCESS_TEXT
         if already_registered:
-            await message.answer(result.message or "Ви вже зареєстровані.")
-    else:
-        await message.answer(result.message or "Не вдалося завершити реєстрацію. Спробуйте пізніше.")
+            menu_text = f"{result.message or 'Ви вже зареєстровані.'}\n\n{REGISTRATION_SUCCESS_TEXT}"
+        await send_menu(
+            message,
+            menu_text,
+            telegram_id=message.from_user.id,
+            is_registered=True,
+        )
+        return
 
     await state.clear()
-    await send_menu(message, "Чим можу допомогти?", telegram_id=message.from_user.id)
+    await message.answer(result.message or "Не вдалося завершити реєстрацію. Спробуйте пізніше.")
+    await send_menu(message, "Спробуйте реєстрацію ще раз через «Почати».", telegram_id=message.from_user.id)
 
 
 async def _begin_register(message: Message, state: FSMContext) -> None:
@@ -143,7 +158,8 @@ async def register_got_contact(message: Message, state: FSMContext) -> None:
 
     await state.update_data(phone=phone)
     await message.answer(
-        "Введіть ім'я та прізвище як: <b>Ім'я Прізвище</b>",
+        "Введіть <b>ім'я та прізвище</b> через пробіл.\n"
+        "Спочатку ім'я, потім прізвище — наприклад: <b>Олена Коваленко</b>",
         reply_markup=ReplyKeyboardRemove(),
     )
     await state.set_state(RegisterFlow.full_name)
@@ -164,8 +180,8 @@ async def register_got_full_name(message: Message, state: FSMContext) -> None:
         )
         return
 
-    first_name, last_name = parsed
-    await state.update_data(name=first_name, last_name=last_name)
+    first_name, lastname = parsed
+    await state.update_data(first_name=first_name, lastname=lastname)
 
     kb = ReplyKeyboardMarkup(
         keyboard=[[KeyboardButton(text=SEX_MALE_TEXT), KeyboardButton(text=SEX_FEMALE_TEXT)]],
@@ -229,7 +245,6 @@ async def register_got_birth_date(message: Message, state: FSMContext) -> None:
 
 @router.message(RegisterFlow.email, F.text == SKIP_EMAIL_TEXT)
 async def register_skip_email(message: Message, state: FSMContext) -> None:
-    await message.answer("Дякую!", reply_markup=ReplyKeyboardRemove())
     await _finish_registration(message, state, email=None)
 
 
@@ -243,7 +258,6 @@ async def register_got_email(message: Message, state: FSMContext) -> None:
         )
         return
 
-    await message.answer("Дякую! Реєстрація завершена \n \n Тепер ви можете користуватися ботом \n \n У каталозі ви можете побачити доступні послуги, та обрати потрібну вам \n \n У списку ваших послуг ви можете побачити активні абонементи, та почати тренування", reply_markup=ReplyKeyboardRemove())
     await _finish_registration(message, state, email=email)
 
 
