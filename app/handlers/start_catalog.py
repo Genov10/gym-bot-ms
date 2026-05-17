@@ -87,7 +87,7 @@ async def order_confirm_no(callback: CallbackQuery) -> None:
     await callback.answer()
     if callback.from_user is None:
         return
-    await send_menu(callback.message, "Ок, повертаю в головне меню.", telegram_id=callback.from_user.id)
+    await send_menu(callback.message, "", telegram_id=callback.from_user.id)
 
 
 @router.callback_query(F.data.startswith("order:confirm:yes:"))

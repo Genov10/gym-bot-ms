@@ -41,5 +41,5 @@ async def create_order(*, telegram_id: int, service_id: int) -> CreateOrderResul
         return CreateOrderResult(success=True, data=payload if isinstance(payload, dict) else None)
     except Exception:
         logger.exception("Failed to create order telegram_id=%s service_id=%s", telegram_id, service_id)
-        return CreateOrderResult(success=False, message="Failed to create order")
+        return CreateOrderResult(success=False, message="У вас вже є активний абонемент")
 
