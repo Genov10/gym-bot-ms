@@ -10,7 +10,7 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, KeyboardButton, Message, ReplyKeyboardMarkup, ReplyKeyboardRemove
 
 from app.db.session import async_session_factory
-from app.db.users_repo import set_phone_number
+from app.db.users_repo import mark_user_verified, set_phone_number
 from app.handlers.start_common import SEX_FEMALE_TEXT, SEX_MALE_TEXT, START_TEXT
 from app.handlers.start_menu import send_menu
 from app.services.customer import register_customer
@@ -82,8 +82,22 @@ async def _finish_registration(message: Message, state: FSMContext, *, email: st
         email=email,
         birth_date=data.get("birth_date"),
     )
-    if not result.success:
-        await message.answer(result.message or "Цей номер телефону вже зареєстрований.")
+
+    msg = (result.message or "").lower()
+    already_registered = not result.success and ("зареєстрован" in msg or "registered" in msg)
+
+    if result.success or already_registered:
+        async with async_session_factory() as session:
+            await mark_user_verified(
+                session,
+                telegram_id=message.from_user.id,
+                phone_number=phone,
+                first_name=name,
+            )
+        if already_registered:
+            await message.answer(result.message or "Ви вже зареєстровані.")
+    else:
+        await message.answer(result.message or "Не вдалося завершити реєстрацію. Спробуйте пізніше.")
 
     await state.clear()
     await send_menu(message, "Чим можу допомогти?", telegram_id=message.from_user.id)
@@ -115,6 +129,10 @@ async def action_register(callback: CallbackQuery, state: FSMContext) -> None:
 @router.message(RegisterFlow.contact, F.contact)
 async def register_got_contact(message: Message, state: FSMContext) -> None:
     if message.contact is None or message.from_user is None:
+        return
+
+    if message.contact.user_id is not None and message.contact.user_id != message.from_user.id:
+        await message.answer("Поділіться своїм номером через кнопку нижче, а не контактом іншої людини.")
         return
 
     phone = message.contact.phone_number
@@ -225,7 +243,7 @@ async def register_got_email(message: Message, state: FSMContext) -> None:
         )
         return
 
-    await message.answer("Дякую!", reply_markup=ReplyKeyboardRemove())
+    await message.answer("Дякую! Реєстрація завершена \n \n Тепер ви можете користуватися ботом \n \n У каталозі ви можете побачити доступні послуги, та обрати потрібну вам \n \n У списку ваших послуг ви можете побачити активні абонементи, та почати тренування", reply_markup=ReplyKeyboardRemove())
     await _finish_registration(message, state, email=email)
 
 

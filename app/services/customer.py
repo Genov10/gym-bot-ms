@@ -37,21 +37,20 @@ async def register_customer(
     birth_date: date | None = None,
 ) -> RegisterCustomerResult:
     url = settings.external_api_base_url.rstrip("/") + "/api/gym-register-customer"
+    params = {
+        "telegram_id": telegram_id,
+        "name": name,
+        "last_name": last_name,
+        "username": username,
+        "phone": phone,
+        "sex": sex,
+        "email": email,
+        "birth_date": birth_date.isoformat() if birth_date else None,
+    }
+    params = {k: v for k, v in params.items() if v is not None}
     try:
         async with httpx.AsyncClient(timeout=settings.external_api_timeout_sec) as client:
-            r = await client.get(
-                url,
-                params={
-                    "telegram_id": telegram_id,
-                    "name": name,
-                    "last_name": last_name,
-                    "username": username,
-                    "phone": phone,
-                    "sex": sex,
-                    "email": email,
-                    "birth_date": birth_date.isoformat() if birth_date else None,
-                },
-            )
+            r = await client.get(url, params=params)
             r.raise_for_status()
             payload = r.json()
 
@@ -68,4 +67,4 @@ async def register_customer(
             return RegisterCustomerResult(success=True, data=payload if isinstance(payload, dict) else None)
     except Exception:
         logger.exception("Failed to register customer")
-        raise
+        return RegisterCustomerResult(success=False, message="Не вдалося з'єднатися з сервером. Спробуйте пізніше.")

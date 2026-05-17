@@ -24,7 +24,7 @@ async def send_menu(message: Message, text: str, *, telegram_id: int | None = No
     async with async_session_factory() as session:
         await clear_active_visit_if_expired(session, telegram_id=telegram_id)
         user = await get_by_telegram_id(session, telegram_id)
-        registered = user is not None and user.phone_number is not None
+        registered = user is not None and user.is_verified
         active = await is_active_visit(session, telegram_id=telegram_id)
 
     await message.answer(text, reply_markup=menu_kb(is_registered=registered, has_active_visit=active))

@@ -42,6 +42,27 @@ async def set_phone_number(session: AsyncSession, *, telegram_id: int, phone_num
     return user
 
 
+async def mark_user_verified(
+    session: AsyncSession,
+    *,
+    telegram_id: int,
+    phone_number: str,
+    first_name: str | None = None,
+) -> User:
+    user = await get_by_telegram_id(session, telegram_id)
+    if user is None:
+        user = User(telegram_id=telegram_id, phone_number=phone_number, is_verified=True)
+        session.add(user)
+    else:
+        user.phone_number = phone_number
+        user.is_verified = True
+        if first_name:
+            user.first_name = first_name
+    await session.commit()
+    await session.refresh(user)
+    return user
+
+
 async def set_active_visit_until(session: AsyncSession, *, telegram_id: int, active_until: datetime) -> User:
     user = await get_by_telegram_id(session, telegram_id)
     if user is None:
