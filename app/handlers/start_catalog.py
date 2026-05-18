@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from aiogram import F, Router
 from aiogram.filters import Command
+from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
 
 from app.handlers.start_common import CATALOG_TEXT
@@ -49,7 +50,8 @@ async def cmd_catalog(message: Message) -> None:
 
 
 @router.message(F.text == CATALOG_TEXT)
-async def catalog_from_menu(message: Message) -> None:
+async def catalog_from_menu(message: Message, state: FSMContext) -> None:
+    await state.clear()
     await send_catalog(message)
 
 

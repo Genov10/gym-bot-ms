@@ -4,6 +4,7 @@ from io import BytesIO
 from datetime import datetime, time, timedelta, timezone
 
 from aiogram import F, Router
+from aiogram.fsm.context import FSMContext
 from aiogram.types import (
     BufferedInputFile,
     CallbackQuery,
@@ -58,9 +59,10 @@ async def action_visit(callback: CallbackQuery) -> None:
 
 
 @router.message(F.text == MY_WORKOUTS_TEXT)
-async def visit_from_menu(message: Message) -> None:
+async def visit_from_menu(message: Message, state: FSMContext) -> None:
     if message.from_user is None:
         return
+    await state.clear()
     async with async_session_factory() as session:
         await clear_active_visit_if_expired(session, telegram_id=message.from_user.id)
     await send_customer_catalog(message, telegram_id=message.from_user.id)

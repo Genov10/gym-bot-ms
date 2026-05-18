@@ -4,10 +4,17 @@ import logging
 
 from aiogram import Router
 from aiogram.filters import Command, CommandStart
+from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
 
 from app.db.session import async_session_factory
-from app.db.users_repo import clear_active_visit_if_expired, get_by_telegram_id, is_active_visit, register_or_update
+from app.db.users_repo import (
+    clear_active_visit_if_expired,
+    get_by_telegram_id,
+    heal_legacy_verified,
+    is_active_visit,
+    register_or_update,
+)
 from app.handlers.start_common import HOME_BUTTON_TEXT, home_kb, menu_kb
 from app.services.external_api import ExternalApiClient
 
@@ -29,6 +36,8 @@ async def send_menu(
 
     async with async_session_factory() as session:
         await clear_active_visit_if_expired(session, telegram_id=telegram_id)
+        if is_registered is None:
+            await heal_legacy_verified(session, telegram_id=telegram_id)
         user = await get_by_telegram_id(session, telegram_id)
         registered = is_registered if is_registered is not None else (user is not None and user.is_verified)
         active = await is_active_visit(session, telegram_id=telegram_id)
@@ -38,7 +47,8 @@ async def send_menu(
 
 
 @router.message(CommandStart())
-async def cmd_start(message: Message, api: ExternalApiClient) -> None:
+async def cmd_start(message: Message, state: FSMContext, api: ExternalApiClient) -> None:
+    await state.clear()
     if message.from_user is None:
         return
 
@@ -71,11 +81,13 @@ async def cmd_start(message: Message, api: ExternalApiClient) -> None:
 
 
 @router.message(Command("menu"))
-async def cmd_menu(message: Message) -> None:
+async def cmd_menu(message: Message, state: FSMContext) -> None:
+    await state.clear()
     await send_menu(message, "Чим можу допомогти?")
 
 
 @router.message(lambda m: m.text == HOME_BUTTON_TEXT)
-async def home_button(message: Message) -> None:
+async def home_button(message: Message, state: FSMContext) -> None:
+    await state.clear()
     await send_menu(message, "Чим можу допомогти?")
 

@@ -7,6 +7,7 @@ from app.handlers.start_visit import router as start_visit_router
 
 router = Router(name="start")
 router.include_router(start_menu_router)
-router.include_router(start_registration_router)
 router.include_router(start_catalog_router)
 router.include_router(start_visit_router)
+# Реєстрація (FSM) — після меню/каталогу, щоб «Каталог» не ловився як email/дата
+router.include_router(start_registration_router)

@@ -11,7 +11,7 @@ from aiogram.types import CallbackQuery, KeyboardButton, Message, ReplyKeyboardM
 
 from app.db.session import async_session_factory
 from app.db.users_repo import mark_user_verified, set_phone_number
-from app.handlers.start_common import SEX_FEMALE_TEXT, SEX_MALE_TEXT, START_TEXT
+from app.handlers.start_common import MENU_BUTTON_TEXTS, SEX_FEMALE_TEXT, SEX_MALE_TEXT, START_TEXT
 from app.handlers.start_menu import send_menu
 from app.services.customer import register_customer
 
@@ -167,7 +167,7 @@ async def register_got_contact_invalid(message: Message) -> None:
     await message.answer("Натисніть кнопку «📱 Поділитися номером» нижче")
 
 
-@router.message(RegisterFlow.full_name, F.text)
+@router.message(RegisterFlow.full_name, F.text, ~F.text.in_(MENU_BUTTON_TEXTS))
 async def register_got_full_name(message: Message, state: FSMContext) -> None:
     parsed = _parse_full_name((message.text or "").strip())
     if parsed is None:
@@ -211,7 +211,7 @@ async def register_got_sex_invalid(message: Message) -> None:
     await message.answer(f"Будь ласка, оберіть стать: {SEX_MALE_TEXT} або {SEX_FEMALE_TEXT}.")
 
 
-@router.message(RegisterFlow.birth_date, F.text)
+@router.message(RegisterFlow.birth_date, F.text, ~F.text.in_(MENU_BUTTON_TEXTS))
 async def register_got_birth_date(message: Message, state: FSMContext) -> None:
     raw = (message.text or "").strip()
     try:
@@ -245,7 +245,7 @@ async def register_skip_email(message: Message, state: FSMContext) -> None:
     await _finish_registration(message, state, email=None)
 
 
-@router.message(RegisterFlow.email, F.text)
+@router.message(RegisterFlow.email, F.text, ~F.text.in_(MENU_BUTTON_TEXTS))
 async def register_got_email(message: Message, state: FSMContext) -> None:
     email = _validate_email(message.text or "")
     if email is None:

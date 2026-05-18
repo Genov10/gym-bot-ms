@@ -12,6 +12,17 @@ CATALOG_TEXT = "Каталог"
 MY_WORKOUTS_TEXT = "Мої тренування"
 FINISH_WORKOUT_TEXT = "Завершити тренування"
 
+# Reply-кнопки головного меню — не обробляти їх як кроки реєстрації (FSM).
+MENU_BUTTON_TEXTS: frozenset[str] = frozenset(
+    {
+        START_TEXT,
+        CATALOG_TEXT,
+        MY_WORKOUTS_TEXT,
+        FINISH_WORKOUT_TEXT,
+        HOME_BUTTON_TEXT,
+    }
+)
+
 
 def menu_kb(*, is_registered: bool, has_active_visit: bool) -> ReplyKeyboardMarkup:
     if not is_registered:

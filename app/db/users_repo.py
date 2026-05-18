@@ -42,6 +42,15 @@ async def set_phone_number(session: AsyncSession, *, telegram_id: int, phone_num
     return user
 
 
+async def heal_legacy_verified(session: AsyncSession, *, telegram_id: int) -> None:
+    """Users with phone but is_verified=false (registered before the flag existed)."""
+    user = await get_by_telegram_id(session, telegram_id)
+    if user is None or user.is_verified or not user.phone_number:
+        return
+    user.is_verified = True
+    await session.commit()
+
+
 async def mark_user_verified(
     session: AsyncSession,
     *,
