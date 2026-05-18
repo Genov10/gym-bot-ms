@@ -90,10 +90,7 @@ async def _finish_registration(message: Message, state: FSMContext, *, email: st
         birth_date=data.get("birth_date"),
     )
 
-    msg = (result.message or "").lower()
-    already_registered = not result.success and ("зареєстрован" in msg or "registered" in msg)
-
-    if result.success or already_registered:
+    if result.success or result.already_exists:
         async with async_session_factory() as session:
             await mark_user_verified(
                 session,
@@ -103,7 +100,7 @@ async def _finish_registration(message: Message, state: FSMContext, *, email: st
             )
         await state.clear()
         menu_text = REGISTRATION_SUCCESS_TEXT
-        if already_registered:
+        if result.already_exists:
             menu_text = f"{result.message or 'Ви вже зареєстровані.'}\n\n{REGISTRATION_SUCCESS_TEXT}"
         await send_menu(
             message,

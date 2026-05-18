@@ -24,6 +24,33 @@ class RegisterCustomerResult:
     success: bool
     message: str | None = None
     data: dict[str, Any] | None = None
+    already_exists: bool = False
+
+
+def _response_payload(response: httpx.Response) -> dict[str, Any]:
+    try:
+        data = response.json()
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+
+def _error_message(response: httpx.Response, payload: dict[str, Any]) -> str:
+    message = payload.get("message")
+    if isinstance(message, str) and message.strip():
+        return message
+
+    if response.status_code == 422:
+        errors = payload.get("errors")
+        if isinstance(errors, dict):
+            parts: list[str] = []
+            for field, items in errors.items():
+                if isinstance(items, list) and items:
+                    parts.append(f"{field}: {items[0]}")
+            if parts:
+                return "; ".join(parts)
+
+    return f"Помилка сервера (HTTP {response.status_code})"
 
 
 async def register_customer(
@@ -62,21 +89,40 @@ async def register_customer(
     try:
         async with httpx.AsyncClient(timeout=settings.external_api_timeout_sec) as client:
             logger.info("Register customer request telegram_id=%s params_keys=%s", telegram_id, sorted(params))
-            r = await client.get(url, params=params)
-            r.raise_for_status()
-            payload = r.json()
+            response = await client.get(url, params=params)
+            payload = _response_payload(response)
 
-            # Support both shapes:
-            # 1) {"success": true/false, "message": "...", "data": {...}}
-            # 2) direct customer object {...}
+            if response.status_code == 409:
+                return RegisterCustomerResult(
+                    success=False,
+                    message=_error_message(response, payload),
+                    data=payload.get("data") if isinstance(payload.get("data"), dict) else None,
+                    already_exists=True,
+                )
+
             if isinstance(payload, dict) and "success" in payload:
                 return RegisterCustomerResult(
                     success=bool(payload.get("success")),
-                    message=payload.get("message"),
+                    message=payload.get("message") if isinstance(payload.get("message"), str) else None,
                     data=payload.get("data") if isinstance(payload.get("data"), dict) else None,
                 )
 
-            return RegisterCustomerResult(success=True, data=payload if isinstance(payload, dict) else None)
-    except Exception:
-        logger.exception("Failed to register customer")
-        return RegisterCustomerResult(success=False, message="Не вдалося з'єднатися з сервером. Спробуйте пізніше.")
+            if response.is_success:
+                return RegisterCustomerResult(success=True, data=payload or None)
+
+            logger.warning(
+                "Register customer failed telegram_id=%s status=%s payload=%s",
+                telegram_id,
+                response.status_code,
+                payload,
+            )
+            return RegisterCustomerResult(
+                success=False,
+                message=_error_message(response, payload),
+            )
+    except httpx.RequestError:
+        logger.exception("Register customer network error telegram_id=%s", telegram_id)
+        return RegisterCustomerResult(
+            success=False,
+            message="Не вдалося з'єднатися з сервером. Спробуйте пізніше.",
+        )
