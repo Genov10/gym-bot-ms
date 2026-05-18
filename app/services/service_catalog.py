@@ -12,6 +12,7 @@ class ServiceItem:
     code: str
     title: str
     price_uah: int
+    description: str
 
 
 async def get_service_catalog() -> list[ServiceItem] | None:
@@ -37,6 +38,7 @@ async def get_service_catalog() -> list[ServiceItem] | None:
                     code=str(svc.get("id") or svc.get("code")),
                     title=str(svc.get("name") or svc.get("title")),
                     price_uah=int(svc.get("price") or svc.get("price_uah") or 0),
+                    description=str(svc.get("description")),
                 )
             )
         if items:

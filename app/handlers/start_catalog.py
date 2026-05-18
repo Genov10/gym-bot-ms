@@ -71,7 +71,7 @@ async def choose_service(callback: CallbackQuery) -> None:
 
     await callback.answer()
     await callback.message.answer(
-        f"Обрано: <b>{chosen.title}</b>\nЦіна: <b>{chosen.price_uah} ₴</b>\n\nПерейти до оплати?",
+        f"Обрано: <b>{chosen.title}</b>\nЦіна: <b>{chosen.price_uah} ₴</b>\n\n{chosen.description}\n\nПерейти до оплати?",
         reply_markup=InlineKeyboardMarkup(
             inline_keyboard=[
                 [
