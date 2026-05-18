@@ -15,5 +15,8 @@ class Settings(BaseSettings):
     bot_http_host: str = "0.0.0.0"
     bot_http_port: int = 8082
 
+    # Auto-delete visit QR from chat after N seconds (0 = do not delete)
+    qr_message_ttl_sec: int = 120
+
 
 settings = Settings()

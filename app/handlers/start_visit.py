@@ -17,12 +17,13 @@ from aiogram.types import (
 
 import segno
 
+from app.config import settings
 from app.db.session import async_session_factory
 from app.db.users_repo import clear_active_visit, clear_active_visit_if_expired, is_active_visit, set_active_visit_until
 from app.handlers.start_menu import send_menu
 from app.handlers.start_common import FINISH_WORKOUT_TEXT, MY_WORKOUTS_TEXT
 from app.services.service_visit import finish_visit, get_service_visit, start_visit
-from app.telegram_sensitive import SPOILER_PHOTO_KWARGS
+from app.telegram_sensitive import SPOILER_PHOTO_KWARGS, schedule_message_delete
 
 router = Router(name="start_visit")
 
@@ -163,10 +164,27 @@ async def customer_service_chosen(callback: CallbackQuery) -> None:
     qr.save(buf, kind="png", scale=8, border=2)
     png = buf.getvalue()
 
-    await callback.message.answer_photo(
+    ttl = settings.qr_message_ttl_sec
+    ttl_hint = ""
+    if ttl >= 60:
+        ttl_hint = f" Фото зникне з чату через {ttl // 60} хв."
+    elif ttl > 0:
+        ttl_hint = f" Фото зникне через {ttl} с."
+
+    qr_message = await callback.message.answer_photo(
         BufferedInputFile(png, filename="visit.png"),
-        caption="Ось твій QR-код для входу. Натисни на зображення, щоб показати код.",
+        caption=(
+            "Ось твій QR-код для входу. Натисни на зображення, щоб показати код."
+            f"{ttl_hint}"
+        ),
         reply_markup=_finish_visit_kb(),
         **SPOILER_PHOTO_KWARGS,
     )
+    if ttl > 0:
+        schedule_message_delete(
+            bot=callback.bot,
+            chat_id=qr_message.chat.id,
+            message_id=qr_message.message_id,
+            delay_sec=float(ttl),
+        )
 
