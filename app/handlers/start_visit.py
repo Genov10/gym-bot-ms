@@ -74,7 +74,7 @@ async def send_customer_catalog(message: Message, *, telegram_id: int | None = N
 
     services = await get_service_visit(telegram_id)
     if not services:
-        await message.answer("У Вас поки немає доступних послуг, саме час оновити абонемен)")
+        await message.answer("У Вас поки немає доступних послуг, саме час оновити абонемент)")
         return
     kb = InlineKeyboardMarkup(
         inline_keyboard=[
