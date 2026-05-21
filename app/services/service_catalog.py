@@ -29,7 +29,7 @@ def _to_int(value: object) -> int | None:
         return None
 
 
-_STRIKE_PAD = " "
+_STRIKE_PAD = ""
 
 
 def _strikethrough_plain(text: str) -> str:
