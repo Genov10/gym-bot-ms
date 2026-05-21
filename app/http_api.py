@@ -5,9 +5,11 @@ import logging
 from typing import Any
 
 from aiogram import Bot
+from aiogram.enums import ParseMode
 from fastapi import FastAPI
 from pydantic import AliasChoices, BaseModel, Field
 
+from app.notification_texts import NOTIFICATION_TO_ONE_DAY, NOTIFICATION_TO_THREE_DAYS
 from app.telegram_sensitive import PROTECT_CONTENT_KWARGS
 
 logger = logging.getLogger(__name__)
@@ -34,6 +36,42 @@ class BroadcastResponse(BaseModel):
     sent: int
     failed: int
     errors: list[dict[str, Any]] = []
+
+
+class TelegramIdsRequest(BaseModel):
+    telegram_ids: list[int] = Field(..., min_length=1)
+
+
+class NotificationByAdminRequest(BaseModel):
+    telegram_ids: list[int] = Field(..., min_length=1)
+    message: str = Field(..., validation_alias=AliasChoices("message", "messege"), min_length=1)
+
+
+async def _broadcast_text(
+    bot: Bot,
+    *,
+    telegram_ids: list[int],
+    text: str,
+    parse_mode: ParseMode | str | None = ParseMode.HTML,
+) -> BroadcastResponse:
+    sent = 0
+    failed = 0
+    errors: list[dict[str, Any]] = []
+
+    for telegram_id in telegram_ids:
+        if telegram_id < 1:
+            failed += 1
+            errors.append({"telegram_id": telegram_id, "error": "invalid telegram_id"})
+            continue
+        try:
+            await bot.send_message(telegram_id, text, parse_mode=parse_mode, **PROTECT_CONTENT_KWARGS)
+            sent += 1
+        except Exception as e:
+            failed += 1
+            logger.exception("Failed to send notification telegram_id=%s", telegram_id)
+            errors.append({"telegram_id": telegram_id, "error": str(e)})
+
+    return BroadcastResponse(total=len(telegram_ids), sent=sent, failed=failed, errors=errors)
 
 
 def _payment_result_message(*, success: bool, service_name: str) -> str:
@@ -84,6 +122,23 @@ def create_http_app(*, bot: Bot) -> FastAPI:
                 errors.append({"telegram_id": it.telegram_id, "service_id": it.service_id, "error": str(e)})
 
         return BroadcastResponse(total=len(items), sent=sent, failed=failed, errors=errors)
+
+    @app.post("/notification-by-admin", response_model=BroadcastResponse)
+    async def notification_by_admin(body: NotificationByAdminRequest) -> BroadcastResponse:
+        return await _broadcast_text(
+            bot,
+            telegram_ids=body.telegram_ids,
+            text=body.message,
+            parse_mode=None,
+        )
+
+    @app.post("/notification-to-one-day", response_model=BroadcastResponse)
+    async def notification_to_one_day(body: TelegramIdsRequest) -> BroadcastResponse:
+        return await _broadcast_text(bot, telegram_ids=body.telegram_ids, text=NOTIFICATION_TO_ONE_DAY)
+
+    @app.post("/notification-to-tree-days", response_model=BroadcastResponse)
+    async def notification_to_tree_days(body: TelegramIdsRequest) -> BroadcastResponse:
+        return await _broadcast_text(bot, telegram_ids=body.telegram_ids, text=NOTIFICATION_TO_THREE_DAYS)
 
     return app
 
