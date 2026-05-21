@@ -8,7 +8,7 @@ from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMar
 from app.handlers.start_common import CATALOG_TEXT
 from app.handlers.start_menu import send_menu
 from app.services.order import create_order
-from app.services.service_catalog import get_service_catalog
+from app.services.service_catalog import format_service_price_html, format_service_price_plain, get_service_catalog
 
 router = Router(name="start_catalog")
 
@@ -28,7 +28,7 @@ async def send_catalog(message: Message, *, telegram_id: int) -> None:
         inline_keyboard=[
             [
                 InlineKeyboardButton(
-                    text=f"{s.title} — {s.price_uah} ₴",
+                    text=f"{s.title} — {format_service_price_plain(s)}",
                     callback_data=f"service:{s.code}",
                 )
             ]
@@ -82,7 +82,7 @@ async def choose_service(callback: CallbackQuery) -> None:
 
     await callback.answer()
     await callback.message.answer(
-        f"Обрано: <b>{chosen.title}</b>\nЦіна: <b>{chosen.price_uah} ₴</b>\n\n{chosen.description}\n\nПерейти до оплати?",
+        f"Обрано: <b>{chosen.title}</b>\nЦіна: {format_service_price_html(chosen)}\n\n{chosen.description}\n\nПерейти до оплати?",
         reply_markup=InlineKeyboardMarkup(
             inline_keyboard=[
                 [

@@ -17,6 +17,33 @@ class ServiceItem:
     title: str
     price_uah: int
     description: str
+    sale_from: int | None = None
+
+
+def _to_int(value: object) -> int | None:
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _strikethrough_plain(text: str) -> str:
+    """Зачёркивание для plain-text (кнопки inline-клавиатуры без HTML)."""
+    return "".join(f"{char}\u0336" for char in text)
+
+
+def format_service_price_plain(item: ServiceItem) -> str:
+    if item.sale_from is not None and item.sale_from != item.price_uah:
+        return f"{_strikethrough_plain(str(item.sale_from))} {item.price_uah} ₴"
+    return f"{item.price_uah} ₴"
+
+
+def format_service_price_html(item: ServiceItem) -> str:
+    if item.sale_from is not None and item.sale_from != item.price_uah:
+        return f"<s>{item.sale_from}</s> <b>{item.price_uah}</b> ₴"
+    return f"<b>{item.price_uah}</b> ₴"
 
 
 async def get_service_catalog(telegram_id: int) -> list[ServiceItem] | None:
@@ -37,12 +64,14 @@ async def get_service_catalog(telegram_id: int) -> list[ServiceItem] | None:
 
         items: list[ServiceItem] = []
         for svc in data:
+            price_uah = _to_int(svc.get("sale")) or _to_int(svc.get("price")) or _to_int(svc.get("price_uah")) or 0
             items.append(
                 ServiceItem(
                     code=str(svc.get("id") or svc.get("code")),
                     title=str(svc.get("name") or svc.get("title")),
-                    price_uah=int(svc.get("sale") or svc.get("price") or svc.get("price_uah") or 0),
-                    description=str(svc.get("description")),
+                    price_uah=price_uah,
+                    description=str(svc.get("description") or ""),
+                    sale_from=_to_int(svc.get("sale_from")),
                 )
             )
         if items:
