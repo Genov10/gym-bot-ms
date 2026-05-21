@@ -29,9 +29,14 @@ def _to_int(value: object) -> int | None:
         return None
 
 
+# Тонкий пробіл — майже не видно, але лінія зачеркнення виходить на 1 символ з боків.
+_STRIKE_PAD = "\u2009"
+
+
 def _strikethrough_plain(text: str) -> str:
-    """Зачёркивание в кнопках (без HTML). U+0335 — лінія ближче до центру цифр, ніж U+0336."""
-    return "".join(f"{char}\u0335" for char in text)
+    """Зачёркивание в кнопках (без HTML). U+0335 — лінія по центру; паддинг зліва/справа."""
+    extended = f"{_STRIKE_PAD}{text}{_STRIKE_PAD}"
+    return "".join(f"{char}\u0335" for char in extended)
 
 
 def format_service_price_plain(item: ServiceItem) -> str:
