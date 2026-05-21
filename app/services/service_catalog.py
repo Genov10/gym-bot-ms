@@ -29,8 +29,7 @@ def _to_int(value: object) -> int | None:
         return None
 
 
-# Тонкий пробіл — майже не видно, але лінія зачеркнення виходить на 1 символ з боків.
-_STRIKE_PAD = "\u2009"
+_STRIKE_PAD = " "
 
 
 def _strikethrough_plain(text: str) -> str:
