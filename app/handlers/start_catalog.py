@@ -19,8 +19,8 @@ START_TRAINING_TEXT = "Почати тренування"
 MENU_TEXT = "🏠 Головне меню"
 
 
-async def send_catalog(message: Message) -> None:
-    services = await get_service_catalog()
+async def send_catalog(message: Message, *, telegram_id: int) -> None:
+    services = await get_service_catalog(telegram_id)
     if not services:
         await message.answer("Каталог послуг поки порожній.")
         return
@@ -41,18 +41,24 @@ async def send_catalog(message: Message) -> None:
 @router.callback_query(F.data == "action:catalog")
 async def action_catalog(callback: CallbackQuery) -> None:
     await callback.answer()
-    await send_catalog(callback.message)
+    if callback.from_user is None:
+        return
+    await send_catalog(callback.message, telegram_id=callback.from_user.id)
 
 
 @router.message(Command("catalog"))
 async def cmd_catalog(message: Message) -> None:
-    await send_catalog(message)
+    if message.from_user is None:
+        return
+    await send_catalog(message, telegram_id=message.from_user.id)
 
 
 @router.message(F.text == CATALOG_TEXT)
 async def catalog_from_menu(message: Message, state: FSMContext) -> None:
     await state.clear()
-    await send_catalog(message)
+    if message.from_user is None:
+        return
+    await send_catalog(message, telegram_id=message.from_user.id)
 
 
 @router.callback_query(F.data.startswith("service:"))
@@ -61,7 +67,10 @@ async def choose_service(callback: CallbackQuery) -> None:
         return
     code = callback.data.split("service:", 1)[1]
 
-    services = await get_service_catalog()
+    if callback.from_user is None:
+        return
+
+    services = await get_service_catalog(callback.from_user.id)
     if not services:
         await callback.answer("Наразі немає доступних послуг", show_alert=True)
         return

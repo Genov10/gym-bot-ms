@@ -2,9 +2,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+import logging
+
 import httpx
 
 from app.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True, slots=True)
@@ -15,15 +19,15 @@ class ServiceItem:
     description: str
 
 
-async def get_service_catalog() -> list[ServiceItem] | None:
+async def get_service_catalog(telegram_id: int) -> list[ServiceItem] | None:
     """
-    Сейчас: пытаемся получить услуги с внешнего API.
-    Если API недоступно/формат неожиданный/услуг нет — возвращаем None.
+    Каталог послуг зовнішнього API (потрібен telegram_id).
+    Якщо API недоступно/формат неочікуваний/послуг немає — повертає None.
     """
     url = settings.external_api_base_url.rstrip("/") + "/api/gym-services"
     try:
         async with httpx.AsyncClient(timeout=settings.external_api_timeout_sec) as client:
-            r = await client.get(url)
+            r = await client.get(url, params={"telegram_id": telegram_id})
             r.raise_for_status()
             payload = r.json()
 
@@ -37,15 +41,14 @@ async def get_service_catalog() -> list[ServiceItem] | None:
                 ServiceItem(
                     code=str(svc.get("id") or svc.get("code")),
                     title=str(svc.get("name") or svc.get("title")),
-                    price_uah=int(svc.get("price") or svc.get("price_uah") or 0),
+                    price_uah=int(svc.get("sale") or svc.get("price") or svc.get("price_uah") or 0),
                     description=str(svc.get("description")),
                 )
             )
         if items:
             return items
     except Exception:
-        # fallback to mock below
-        pass
+        logger.exception("Failed to fetch service catalog telegram_id=%s", telegram_id)
 
     return None
 
