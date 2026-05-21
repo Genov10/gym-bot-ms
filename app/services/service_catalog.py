@@ -30,8 +30,8 @@ def _to_int(value: object) -> int | None:
 
 
 def _strikethrough_plain(text: str) -> str:
-    """Зачёркивание для plain-text (кнопки inline-клавиатуры без HTML)."""
-    return "".join(f"{char}\u0336" for char in text)
+    """Зачёркивание в кнопках (без HTML). U+0335 — лінія ближче до центру цифр, ніж U+0336."""
+    return "".join(f"{char}\u0335" for char in text)
 
 
 def format_service_price_plain(item: ServiceItem) -> str:
