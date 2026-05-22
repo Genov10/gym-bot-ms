@@ -4,7 +4,7 @@ from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, KeyboardBu
 
 HOME_BUTTON_TEXT = "🏠 Головне меню"
 
-ADMIN_CONTACT_TEXT = "Зв'язок з адміністратором"
+ADMIN_CONTACT_TEXT = "Адміністратор"
 ADMIN_TELEGRAM_USERNAME = "alin_kozachenko"
 ADMIN_TELEGRAM_URL = f"https://t.me/{ADMIN_TELEGRAM_USERNAME}"
 
