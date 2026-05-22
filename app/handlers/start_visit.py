@@ -30,6 +30,9 @@ router = Router(name="start_visit")
 
 FINISH_VISIT_TEXT = "Завершити тренування"
 
+QR_FINISH_HINT_TEXT = "Натисніть кнопку, щоб завершити тренування"
+WORKOUT_FINISHED_TEXT = "Поверніть ключик та перевіряйте особисті речі"
+
 
 def _finish_visit_kb() -> ReplyKeyboardMarkup:
     return ReplyKeyboardMarkup(
@@ -108,7 +111,7 @@ async def finish_training(message: Message) -> None:
     async with async_session_factory() as session:
         await clear_active_visit(session, telegram_id=message.from_user.id)
 
-    await message.answer("Тренування завершено. До зустрічі!", reply_markup=ReplyKeyboardRemove())
+    await message.answer(WORKOUT_FINISHED_TEXT, reply_markup=ReplyKeyboardRemove())
     await send_menu(message, "Чим можу допомогти?", telegram_id=message.from_user.id)
 
 
@@ -140,7 +143,7 @@ async def finish_training_inline(callback: CallbackQuery) -> None:
     async with async_session_factory() as session:
         await clear_active_visit(session, telegram_id=callback.from_user.id)
 
-    await callback.message.answer("Тренування завершено. До зустрічі!")
+    await callback.message.answer(WORKOUT_FINISHED_TEXT)
     await send_menu(callback.message, "Чим можу допомогти?", telegram_id=callback.from_user.id)
 
 
@@ -189,4 +192,6 @@ async def customer_service_chosen(callback: CallbackQuery) -> None:
             message_id=qr_message.message_id,
             delay_sec=float(ttl),
         )
+
+    await callback.message.answer(QR_FINISH_HINT_TEXT)
 

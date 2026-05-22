@@ -1,8 +1,12 @@
 from __future__ import annotations
 
-from aiogram.types import KeyboardButton, ReplyKeyboardMarkup
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup
 
 HOME_BUTTON_TEXT = "🏠 Головне меню"
+
+ADMIN_CONTACT_TEXT = "Зв'язок з адміністратором"
+ADMIN_TELEGRAM_USERNAME = "alin_kozachenko"
+ADMIN_TELEGRAM_URL = f"https://t.me/{ADMIN_TELEGRAM_USERNAME}"
 
 SEX_MALE_TEXT = "Чоловік"
 SEX_FEMALE_TEXT = "Жінка"
@@ -20,25 +24,47 @@ MENU_BUTTON_TEXTS: frozenset[str] = frozenset(
         MY_WORKOUTS_TEXT,
         FINISH_WORKOUT_TEXT,
         HOME_BUTTON_TEXT,
+        ADMIN_CONTACT_TEXT,
     }
 )
 
 
+def admin_contact_inline_kb() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text=f"Написати @{ADMIN_TELEGRAM_USERNAME}",
+                    url=ADMIN_TELEGRAM_URL,
+                )
+            ]
+        ]
+    )
+
+
 def menu_kb(*, is_registered: bool, has_active_visit: bool) -> ReplyKeyboardMarkup:
+    admin_row = [KeyboardButton(text=ADMIN_CONTACT_TEXT)]
+
     if not is_registered:
         return ReplyKeyboardMarkup(
-            keyboard=[[KeyboardButton(text=START_TEXT)]],
+            keyboard=[[KeyboardButton(text=START_TEXT)], admin_row],
             resize_keyboard=True,
             one_time_keyboard=False,
             input_field_placeholder="Натисни «Почати»",
         )
 
-    row = [KeyboardButton(text=CATALOG_TEXT), KeyboardButton(text=MY_WORKOUTS_TEXT)]
+    rows: list[list[KeyboardButton]] = [
+        [
+            KeyboardButton(text=CATALOG_TEXT),
+            KeyboardButton(text=MY_WORKOUTS_TEXT),
+            KeyboardButton(text=ADMIN_CONTACT_TEXT),
+        ]
+    ]
     if has_active_visit:
-        row.append(KeyboardButton(text=FINISH_WORKOUT_TEXT))
+        rows.append([KeyboardButton(text=FINISH_WORKOUT_TEXT)])
 
     return ReplyKeyboardMarkup(
-        keyboard=[row],
+        keyboard=rows,
         resize_keyboard=True,
         one_time_keyboard=False,
         input_field_placeholder="Обери дію",
@@ -47,7 +73,10 @@ def menu_kb(*, is_registered: bool, has_active_visit: bool) -> ReplyKeyboardMark
 
 def home_kb() -> ReplyKeyboardMarkup:
     return ReplyKeyboardMarkup(
-        keyboard=[[KeyboardButton(text=HOME_BUTTON_TEXT)]],
+        keyboard=[
+            [KeyboardButton(text=HOME_BUTTON_TEXT)],
+            [KeyboardButton(text=ADMIN_CONTACT_TEXT)],
+        ],
         resize_keyboard=True,
         one_time_keyboard=False,
         input_field_placeholder="Обери дію",

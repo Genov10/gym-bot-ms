@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 
-from aiogram import Router
+from aiogram import F, Router
 from aiogram.filters import Command, CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
@@ -15,7 +15,12 @@ from app.db.users_repo import (
     is_active_visit,
     register_or_update,
 )
-from app.handlers.start_common import HOME_BUTTON_TEXT, home_kb, menu_kb
+from app.handlers.start_common import (
+    ADMIN_CONTACT_TEXT,
+    admin_contact_inline_kb,
+    HOME_BUTTON_TEXT,
+    menu_kb,
+)
 from app.services.external_api import ExternalApiClient
 
 logger = logging.getLogger(__name__)
@@ -90,4 +95,12 @@ async def cmd_menu(message: Message, state: FSMContext) -> None:
 async def home_button(message: Message, state: FSMContext) -> None:
     await state.clear()
     await send_menu(message, "Чим можу допомогти?")
+
+
+@router.message(F.text == ADMIN_CONTACT_TEXT)
+async def admin_contact(message: Message) -> None:
+    await message.answer(
+        "Натисніть кнопку нижче, щоб відкрити чат з адміністратором:",
+        reply_markup=admin_contact_inline_kb(),
+    )
 
