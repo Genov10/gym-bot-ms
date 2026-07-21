@@ -101,7 +101,7 @@ def _validate_email(raw: str) -> str | None:
 async def _ask_full_name(message: Message, state: FSMContext) -> None:
     await message.answer(
         "Введіть <b>ім'я та прізвище</b> через пробіл.\n"
-        "Спочатку ім'я, потім прізвище</b>",
+        "Спочатку ім'я, потім прізвище — наприклад: <b>Олена Коваленко</b>",
         reply_markup=ReplyKeyboardRemove(),
     )
     await state.set_state(RegisterFlow.full_name)
@@ -114,8 +114,16 @@ async def _continue_after_discount(callback: CallbackQuery, state: FSMContext) -
     try:
         await callback.message.edit_reply_markup(reply_markup=None)
     except Exception:
-        pass
-    await _ask_full_name(callback.message, state)
+        logger.exception("Failed to clear discount keyboard")
+    try:
+        await _ask_full_name(callback.message, state)
+    except Exception:
+        logger.exception("Failed to continue registration after discount step")
+        await callback.message.answer(
+            "Введіть ім'я та прізвище через пробіл, наприклад: Олена Коваленко",
+            reply_markup=ReplyKeyboardRemove(),
+        )
+        await state.set_state(RegisterFlow.full_name)
 
 
 async def _finish_registration(message: Message, state: FSMContext, *, email: str | None) -> None:
