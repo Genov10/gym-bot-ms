@@ -44,6 +44,8 @@ async def main() -> None:
     http_task = asyncio.create_task(http_server.serve())
 
     try:
+        await bot.delete_webhook(drop_pending_updates=False)
+        logger.info("Webhook deleted (if any); starting long polling")
         await dp.start_polling(bot)
     finally:
         http_server.should_exit = True
