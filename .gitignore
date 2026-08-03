@@ -3,6 +3,9 @@
 .env.*
 !.env.example
 
+# Docker local config (pgAdmin credentials, etc.)
+docker/
+
 # Python
 __pycache__/
 *.py[cod]
