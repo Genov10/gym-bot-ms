@@ -9,7 +9,11 @@ from aiogram.enums import ParseMode
 from fastapi import FastAPI
 from pydantic import AliasChoices, BaseModel, Field
 
-from app.notification_texts import NOTIFICATION_TO_ONE_DAY, NOTIFICATION_TO_THREE_DAYS
+from app.notification_texts import (
+    NOTIFICATION_TO_ONE_DAY,
+    NOTIFICATION_TO_THREE_DAYS,
+    NOTIFICATION_UNCLOSED_VISIT,
+)
 from app.telegram_sensitive import PROTECT_CONTENT_KWARGS
 
 logger = logging.getLogger(__name__)
@@ -139,6 +143,10 @@ def create_http_app(*, bot: Bot) -> FastAPI:
     @app.post("/notification-to-tree-days", response_model=BroadcastResponse)
     async def notification_to_tree_days(body: TelegramIdsRequest) -> BroadcastResponse:
         return await _broadcast_text(bot, telegram_ids=body.telegram_ids, text=NOTIFICATION_TO_THREE_DAYS)
+
+    @app.post("/notification-unclosed-visit", response_model=BroadcastResponse)
+    async def notification_unclosed_visit(body: TelegramIdsRequest) -> BroadcastResponse:
+        return await _broadcast_text(bot, telegram_ids=body.telegram_ids, text=NOTIFICATION_UNCLOSED_VISIT)
 
     return app
 

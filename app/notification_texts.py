@@ -8,3 +8,5 @@ NOTIFICATION_TO_ONE_DAY = (
 NOTIFICATION_TO_THREE_DAYS = (
     "Нагадування: ваш абонемент закінчується через 3 дні\n"
 )
+
+NOTIFICATION_UNCLOSED_VISIT = "Ви не забули закінчити тренування?"
