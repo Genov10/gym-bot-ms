@@ -22,6 +22,13 @@ class StartVisitResult:
     success: bool
     message: str | None = None
     visit: str | None = None
+    code: int | None = None
+
+
+TOO_MANY_UNFINISHED_VISITS_CODE = 15
+TOO_MANY_UNFINISHED_VISITS_MESSAGE = (
+    "Ви намагались зайти до залу більше трьох разів. Зверніться до адміністратора"
+)
 
 
 async def get_service_visit(telegram_id: int) -> list[CustomerGymService] | None:
@@ -64,14 +71,31 @@ async def start_visit(telegram_id: int, service_id: int) -> StartVisitResult:
     try:
         async with httpx.AsyncClient(timeout=settings.external_api_timeout_sec) as client:
             r = await client.get(url, params={"telegram_id": telegram_id, "service_id": service_id})
-            r.raise_for_status()
-            payload: Any = r.json()
+            try:
+                payload: Any = r.json()
+            except Exception:
+                payload = None
+
+        if isinstance(payload, dict) and payload.get("success") is False:
+            code = payload.get("code")
+            code_int = code if isinstance(code, int) else None
+            if code_int == TOO_MANY_UNFINISHED_VISITS_CODE:
+                return StartVisitResult(
+                    success=False,
+                    code=code_int,
+                    message=TOO_MANY_UNFINISHED_VISITS_MESSAGE,
+                )
+            return StartVisitResult(
+                success=False,
+                code=code_int,
+                message=payload.get("message"),
+            )
+
+        if not r.is_success:
+            return StartVisitResult(success=False, message="Неможливо почати тренування")
 
         if not isinstance(payload, dict):
             return StartVisitResult(success=False, message="Unexpected response")
-
-        if payload.get("success") is False:
-            return StartVisitResult(success=False, message=payload.get("message"))
 
         data = payload.get("data")
         if not isinstance(data, dict):
