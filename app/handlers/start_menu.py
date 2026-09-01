@@ -9,10 +9,8 @@ from aiogram.types import Message
 
 from app.db.session import async_session_factory
 from app.db.users_repo import (
-    clear_active_visit_if_expired,
     get_by_telegram_id,
     heal_legacy_verified,
-    is_active_visit,
     register_or_update,
 )
 from app.handlers.start_common import (
@@ -40,14 +38,12 @@ async def send_menu(
         telegram_id = message.from_user.id
 
     async with async_session_factory() as session:
-        await clear_active_visit_if_expired(session, telegram_id=telegram_id)
         if is_registered is None:
             await heal_legacy_verified(session, telegram_id=telegram_id)
         user = await get_by_telegram_id(session, telegram_id)
         registered = is_registered if is_registered is not None else (user is not None and user.is_verified)
-        active = await is_active_visit(session, telegram_id=telegram_id)
 
-    await message.answer(text, reply_markup=menu_kb(is_registered=registered, has_active_visit=active))
+    await message.answer(text, reply_markup=menu_kb(is_registered=registered))
     # оставляем HOME кнопку как отдельную reply-клавиатуру только если нужно явно
 
 
