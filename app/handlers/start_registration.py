@@ -9,8 +9,6 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import (
     CallbackQuery,
-    InlineKeyboardButton,
-    InlineKeyboardMarkup,
     KeyboardButton,
     Message,
     ReplyKeyboardMarkup,
@@ -20,7 +18,6 @@ from aiogram.types import (
 from app.db.session import async_session_factory
 from app.db.users_repo import mark_user_verified, set_phone_number
 from app.handlers.start_common import (
-    ADMIN_TELEGRAM_URL,
     MENU_BUTTON_TEXTS,
     SEX_FEMALE_TEXT,
     SEX_MALE_TEXT,
@@ -33,14 +30,7 @@ logger = logging.getLogger(__name__)
 router = Router(name="start_registration")
 
 SKIP_EMAIL_TEXT = "Не вказувати"
-SKIP_DISCOUNT_CALLBACK = "register:discount:continue"
 _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", re.IGNORECASE)
-
-DISCOUNT_INFO_TEXT = (
-    "Якщо ви студент або військовий, ви можете отримати знижки на деякі послуги.\n"
-    "Якщо ви маєте відповідні документи, зв'яжіться з адміністратором.\n"
-    "Ви можете зробити це пізніше."
-)
 
 REGISTRATION_SUCCESS_TEXT = (
     "Дякую! Реєстрація завершена.\n\n"
@@ -64,20 +54,10 @@ def _is_valid_name_part(part: str) -> bool:
 
 class RegisterFlow(StatesGroup):
     contact = State()
-    discount_info = State()
     full_name = State()
     sex = State()
     birth_date = State()
     email = State()
-
-
-def _discount_info_kb() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text="Адміністратор", url=ADMIN_TELEGRAM_URL)],
-            [InlineKeyboardButton(text="Пропустити", callback_data=SKIP_DISCOUNT_CALLBACK)],
-        ]
-    )
 
 
 def _parse_full_name(raw: str) -> tuple[str, str] | None:
@@ -105,25 +85,6 @@ async def _ask_full_name(message: Message, state: FSMContext) -> None:
         reply_markup=ReplyKeyboardRemove(),
     )
     await state.set_state(RegisterFlow.full_name)
-
-
-async def _continue_after_discount(callback: CallbackQuery, state: FSMContext) -> None:
-    await callback.answer()
-    if callback.message is None:
-        return
-    try:
-        await callback.message.edit_reply_markup(reply_markup=None)
-    except Exception:
-        logger.exception("Failed to clear discount keyboard")
-    try:
-        await _ask_full_name(callback.message, state)
-    except Exception:
-        logger.exception("Failed to continue registration after discount step")
-        await callback.message.answer(
-            "Введіть ім'я та прізвище через пробіл, наприклад: Олена Коваленко",
-            reply_markup=ReplyKeyboardRemove(),
-        )
-        await state.set_state(RegisterFlow.full_name)
 
 
 async def _finish_registration(message: Message, state: FSMContext, *, email: str | None) -> None:
@@ -214,26 +175,12 @@ async def register_got_contact(message: Message, state: FSMContext) -> None:
         await set_phone_number(session, telegram_id=message.from_user.id, phone_number=phone)
 
     await state.update_data(phone=phone)
-    await message.answer(DISCOUNT_INFO_TEXT, reply_markup=_discount_info_kb())
-    await state.set_state(RegisterFlow.discount_info)
+    await _ask_full_name(message, state)
 
 
 @router.message(RegisterFlow.contact)
 async def register_got_contact_invalid(message: Message) -> None:
     await message.answer("Натисніть кнопку «📱 Поділитися номером» нижче")
-
-
-@router.callback_query(RegisterFlow.discount_info, F.data == SKIP_DISCOUNT_CALLBACK)
-async def register_discount_skip(callback: CallbackQuery, state: FSMContext) -> None:
-    await _continue_after_discount(callback, state)
-
-
-@router.message(RegisterFlow.discount_info)
-async def register_discount_info_hint(message: Message) -> None:
-    await message.answer(
-        "Натисніть «Адміністратор», щоб написати адміністратору, "
-        "потім «Пропустити», щоб продовжити — або одразу «Пропустити»."
-    )
 
 
 @router.message(RegisterFlow.full_name, F.text, ~F.text.in_(MENU_BUTTON_TEXTS))
