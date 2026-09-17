@@ -108,3 +108,9 @@ async def clear_active_visit_if_expired(session: AsyncSession, *, telegram_id: i
     if user.active_visit_until <= now:
         user.active_visit_until = None
         await session.commit()
+
+
+async def list_menu_targets(session: AsyncSession) -> list[tuple[int, bool]]:
+    """Return (telegram_id, is_registered) for all users that can receive a menu refresh."""
+    r = await session.execute(select(User.telegram_id, User.is_verified))
+    return [(int(telegram_id), bool(is_verified)) for telegram_id, is_verified in r.all()]

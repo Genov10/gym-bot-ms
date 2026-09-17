@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import html
 import logging
 from typing import Any
@@ -9,6 +10,9 @@ from aiogram.enums import ParseMode
 from fastapi import FastAPI
 from pydantic import AliasChoices, BaseModel, Field
 
+from app.db.session import async_session_factory
+from app.db.users_repo import list_menu_targets
+from app.handlers.start_common import menu_kb
 from app.notification_texts import (
     NOTIFICATION_TO_ONE_DAY,
     NOTIFICATION_TO_THREE_DAYS,
@@ -17,6 +21,8 @@ from app.notification_texts import (
 from app.telegram_sensitive import PROTECT_CONTENT_KWARGS
 
 logger = logging.getLogger(__name__)
+
+MENU_REFRESH_TEXT = "\u200b"  # zero-width space: оновити reply-клавіатуру без видимого тексту
 
 
 class PaymentResultRequest(BaseModel):
@@ -147,6 +153,33 @@ def create_http_app(*, bot: Bot) -> FastAPI:
     @app.post("/notification-unclosed-visit", response_model=BroadcastResponse)
     async def notification_unclosed_visit(body: TelegramIdsRequest) -> BroadcastResponse:
         return await _broadcast_text(bot, telegram_ids=body.telegram_ids, text=NOTIFICATION_UNCLOSED_VISIT)
+
+    @app.post("/refresh-menu", response_model=BroadcastResponse)
+    async def refresh_menu() -> BroadcastResponse:
+        """Примусово надіслати актуальну reply-клавіатуру всім користувачам з БД бота."""
+        async with async_session_factory() as session:
+            targets = await list_menu_targets(session)
+
+        sent = 0
+        failed = 0
+        errors: list[dict[str, Any]] = []
+
+        for telegram_id, is_verified in targets:
+            try:
+                await bot.send_message(
+                    telegram_id,
+                    # MENU_REFRESH_TEXT,
+                    reply_markup=menu_kb(is_registered=is_verified),
+                )
+                sent += 1
+            except Exception as e:
+                failed += 1
+                logger.exception("Failed to refresh menu telegram_id=%s", telegram_id)
+                errors.append({"telegram_id": telegram_id, "error": str(e)})
+            # невелика пауза, щоб не впертися в Telegram rate limit
+            await asyncio.sleep(0.05)
+
+        return BroadcastResponse(total=len(targets), sent=sent, failed=failed, errors=errors)
 
     return app
 
