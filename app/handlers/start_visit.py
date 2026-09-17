@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import html
 from io import BytesIO
 
 from aiogram import F, Router
@@ -16,10 +17,73 @@ import segno
 
 from app.config import settings
 from app.handlers.start_common import MY_WORKOUTS_TEXT, menu_kb
-from app.services.service_visit import get_service_visit, start_visit
+from app.services.service_visit import (
+    CustomerGymServiceInfo,
+    get_customer_gym_service_info,
+    get_service_visit,
+    start_visit,
+)
 from app.telegram_sensitive import SPOILER_PHOTO_KWARGS, schedule_message_delete
 
 router = Router(name="start_visit")
+
+START_TRAINING_BUTTON_TEXT = "Отримати QR-код та почати тренування"
+
+
+def _format_service_info_message(info: CustomerGymServiceInfo) -> str:
+    lines = [f"<b>{html.escape(info.service_name)}</b>"]
+
+    if info.description:
+        lines.append(html.escape(info.description))
+
+    if info.date_from:
+        lines.append(f"Початок абонемента: {html.escape(info.date_from)}")
+
+    if info.date_to:
+        lines.append(f"Кінець абонемента: {html.escape(info.date_to)}")
+
+    if info.lefted_visits_amount is not None:
+        lines.append(f"Залишилось відвідувань: {info.lefted_visits_amount}")
+
+    return "\n".join(lines)
+
+
+async def _send_visit_qr(message: Message, *, telegram_id: int, service_id: int) -> None:
+    result = await start_visit(telegram_id=telegram_id, service_id=service_id)
+    if not result.success or not result.visit:
+        await message.answer(result.message or "Не вдалося розпочати візит.")
+        return
+
+    qr = segno.make(result.visit)
+    buf = BytesIO()
+    qr.save(buf, kind="png", scale=8, border=2)
+    png = buf.getvalue()
+
+    ttl = settings.qr_message_ttl_sec
+    ttl_hint = ""
+    if ttl >= 60:
+        ttl_hint = f" Фото зникне з чату через {ttl // 60} хв."
+    elif ttl > 0:
+        ttl_hint = f" Фото зникне через {ttl} с."
+
+    menu = menu_kb(is_registered=True)
+
+    qr_message = await message.answer_photo(
+        BufferedInputFile(png, filename="visit.png"),
+        caption=(
+            "Ось твій QR-код для входу. Натисни на зображення, щоб показати код."
+            f"{ttl_hint}"
+        ),
+        reply_markup=menu,
+        **SPOILER_PHOTO_KWARGS,
+    )
+    if ttl > 0:
+        schedule_message_delete(
+            bot=message.bot,
+            chat_id=qr_message.chat.id,
+            message_id=qr_message.message_id,
+            delay_sec=float(ttl),
+        )
 
 
 @router.callback_query(F.data == "action:visit")
@@ -71,38 +135,38 @@ async def customer_service_chosen(callback: CallbackQuery) -> None:
     if callback.from_user is None or callback.message is None:
         return
 
-    result = await start_visit(telegram_id=callback.from_user.id, service_id=service_id)
-    if not result.success or not result.visit:
-        await callback.message.answer(result.message or "Не вдалося розпочати візит.")
+    info = await get_customer_gym_service_info(
+        telegram_id=callback.from_user.id,
+        service_id=service_id,
+    )
+    if info is None:
+        await callback.message.answer("Не вдалося отримати інформацію про абонемент.")
         return
 
-    qr = segno.make(result.visit)
-    buf = BytesIO()
-    qr.save(buf, kind="png", scale=8, border=2)
-    png = buf.getvalue()
-
-    ttl = settings.qr_message_ttl_sec
-    ttl_hint = ""
-    if ttl >= 60:
-        ttl_hint = f" Фото зникне з чату через {ttl // 60} хв."
-    elif ttl > 0:
-        ttl_hint = f" Фото зникне через {ttl} с."
-
-    menu = menu_kb(is_registered=True)
-
-    qr_message = await callback.message.answer_photo(
-        BufferedInputFile(png, filename="visit.png"),
-        caption=(
-            "Ось твій QR-код для входу. Натисни на зображення, щоб показати код."
-            f"{ttl_hint}"
-        ),
-        reply_markup=menu,
-        **SPOILER_PHOTO_KWARGS,
+    kb = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text=START_TRAINING_BUTTON_TEXT,
+                    callback_data=f"start_training:{service_id}",
+                )
+            ]
+        ]
     )
-    if ttl > 0:
-        schedule_message_delete(
-            bot=callback.bot,
-            chat_id=qr_message.chat.id,
-            message_id=qr_message.message_id,
-            delay_sec=float(ttl),
-        )
+    await callback.message.answer(_format_service_info_message(info), reply_markup=kb)
+
+
+@router.callback_query(F.data.startswith("start_training:"))
+async def start_training_chosen(callback: CallbackQuery) -> None:
+    if callback.data is None:
+        return
+    service_id = int(callback.data.split("start_training:", 1)[1])
+    await callback.answer()
+    if callback.from_user is None or callback.message is None:
+        return
+
+    await _send_visit_qr(
+        callback.message,
+        telegram_id=callback.from_user.id,
+        service_id=service_id,
+    )

@@ -18,6 +18,15 @@ class CustomerGymService:
 
 
 @dataclass(frozen=True, slots=True)
+class CustomerGymServiceInfo:
+    service_name: str
+    description: str | None = None
+    date_from: str | None = None
+    date_to: str | None = None
+    lefted_visits_amount: int | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class StartVisitResult:
     success: bool
     message: str | None = None
@@ -63,6 +72,67 @@ async def get_service_visit(telegram_id: int) -> list[CustomerGymService] | None
         return items or None
     except Exception:
         logger.exception("Failed to fetch customer gym services for telegram_id=%s", telegram_id)
+        return None
+
+
+def _optional_str(value: Any) -> str | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
+
+
+def _optional_int(value: Any) -> int | None:
+    if value is None or value == "":
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+async def get_customer_gym_service_info(
+    telegram_id: int,
+    service_id: int,
+) -> CustomerGymServiceInfo | None:
+    url = settings.external_api_base_url.rstrip("/") + "/api/gym-get-customer-gym-service-info"
+    try:
+        async with httpx.AsyncClient(timeout=settings.external_api_timeout_sec) as client:
+            logger.info(
+                "Calling customer service info: %s telegram_id=%s service_id=%s",
+                url,
+                telegram_id,
+                service_id,
+            )
+            r = await client.get(url, params={"telegram_id": telegram_id, "service_id": service_id})
+            r.raise_for_status()
+            payload: Any = r.json()
+
+        if not isinstance(payload, dict) or payload.get("success") is False:
+            logger.info("Customer service info fetch failed: %s", payload)
+            return None
+
+        data = payload.get("data")
+        if not isinstance(data, dict):
+            return None
+
+        service_name = _optional_str(data.get("service_name"))
+        if not service_name:
+            return None
+
+        return CustomerGymServiceInfo(
+            service_name=service_name,
+            description=_optional_str(data.get("description")),
+            date_from=_optional_str(data.get("date_from")),
+            date_to=_optional_str(data.get("date_to")),
+            lefted_visits_amount=_optional_int(data.get("lefted_visits_amount")),
+        )
+    except Exception:
+        logger.exception(
+            "Failed to fetch customer gym service info telegram_id=%s service_id=%s",
+            telegram_id,
+            service_id,
+        )
         return None
 
 
