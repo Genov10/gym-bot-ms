@@ -168,7 +168,7 @@ def create_http_app(*, bot: Bot) -> FastAPI:
             try:
                 await bot.send_message(
                     telegram_id,
-                    # MENU_REFRESH_TEXT,
+                    MENU_REFRESH_TEXT,
                     reply_markup=menu_kb(is_registered=is_verified),
                 )
                 sent += 1
