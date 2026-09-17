@@ -59,7 +59,7 @@ async def send_customer_catalog(message: Message, *, telegram_id: int | None = N
             for s in services
         ]
     )
-    await message.answer("Доступні тренування", reply_markup=kb)
+    await message.answer("Список ваших абонементів:\n", reply_markup=kb)
 
 
 @router.callback_query(F.data.startswith("customer_service:"))
