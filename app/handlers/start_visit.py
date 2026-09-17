@@ -19,7 +19,9 @@ from app.config import settings
 from app.handlers.start_common import MY_WORKOUTS_TEXT, menu_kb
 from app.services.service_visit import (
     CustomerGymServiceInfo,
+    confirm_freeze,
     get_customer_gym_service_info,
+    get_freeze_preview,
     get_service_visit,
     start_visit,
 )
@@ -28,6 +30,8 @@ from app.telegram_sensitive import SPOILER_PHOTO_KWARGS, schedule_message_delete
 router = Router(name="start_visit")
 
 START_TRAINING_BUTTON_TEXT = "Отримати QR-код та почати тренування"
+FREEZE_BUTTON_TEXT = "Заморозити абонемент"
+FREEZE_CONFIRM_BUTTON_TEXT = "Так, я хочу його заморозити"
 
 
 def _format_service_info_message(info: CustomerGymServiceInfo) -> str:
@@ -143,16 +147,25 @@ async def customer_service_chosen(callback: CallbackQuery) -> None:
         await callback.message.answer("Не вдалося отримати інформацію про абонемент.")
         return
 
-    kb = InlineKeyboardMarkup(
-        inline_keyboard=[
+    rows = [
+        [
+            InlineKeyboardButton(
+                text=START_TRAINING_BUTTON_TEXT,
+                callback_data=f"start_training:{service_id}",
+            )
+        ]
+    ]
+    if info.can_be_frosen:
+        rows.append(
             [
                 InlineKeyboardButton(
-                    text=START_TRAINING_BUTTON_TEXT,
-                    callback_data=f"start_training:{service_id}",
+                    text=FREEZE_BUTTON_TEXT,
+                    callback_data=f"freeze_preview:{service_id}",
                 )
             ]
-        ]
-    )
+        )
+
+    kb = InlineKeyboardMarkup(inline_keyboard=rows)
     await callback.message.answer(_format_service_info_message(info), reply_markup=kb)
 
 
@@ -170,3 +183,62 @@ async def start_training_chosen(callback: CallbackQuery) -> None:
         telegram_id=callback.from_user.id,
         service_id=service_id,
     )
+
+
+@router.callback_query(F.data.startswith("freeze_preview:"))
+async def freeze_preview_chosen(callback: CallbackQuery) -> None:
+    if callback.data is None:
+        return
+    service_id = int(callback.data.split("freeze_preview:", 1)[1])
+    await callback.answer()
+    if callback.from_user is None or callback.message is None:
+        return
+
+    preview = await get_freeze_preview(
+        telegram_id=callback.from_user.id,
+        service_id=service_id,
+    )
+    if preview is None:
+        await callback.message.answer("Не вдалося отримати умови заморозки.")
+        return
+
+    if not preview.can_be_frosen:
+        await callback.message.answer("Цей абонемент зараз неможливо заморозити.")
+        return
+
+    lines = [f"<b>{html.escape(preview.service_name)}</b>", ""]
+    for rule in preview.rules:
+        lines.append(html.escape(rule))
+    lines.extend(["", "Ви впевнені, що хочете заморозити абонемент?"])
+
+    kb = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text=FREEZE_CONFIRM_BUTTON_TEXT,
+                    callback_data=f"freeze_confirm:{service_id}",
+                )
+            ]
+        ]
+    )
+    await callback.message.answer("\n".join(lines), reply_markup=kb)
+
+
+@router.callback_query(F.data.startswith("freeze_confirm:"))
+async def freeze_confirm_chosen(callback: CallbackQuery) -> None:
+    if callback.data is None:
+        return
+    service_id = int(callback.data.split("freeze_confirm:", 1)[1])
+    await callback.answer()
+    if callback.from_user is None or callback.message is None:
+        return
+
+    telegram_id = callback.from_user.id
+    result = await confirm_freeze(telegram_id=telegram_id, service_id=service_id)
+    if not result.success:
+        await callback.message.answer(result.message or "Не вдалося заморозити абонемент.")
+        return
+
+    info = await get_customer_gym_service_info(telegram_id=telegram_id, service_id=service_id)
+    name = info.service_name if info is not None else "Абонемент"
+    await callback.message.answer(f"<b>{html.escape(name)}</b> успішно заморожено")

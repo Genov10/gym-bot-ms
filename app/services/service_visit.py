@@ -24,6 +24,21 @@ class CustomerGymServiceInfo:
     date_from: str | None = None
     date_to: str | None = None
     lefted_visits_amount: int | None = None
+    can_be_frosen: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class FreezePreview:
+    service_name: str
+    rules: tuple[str, ...]
+    can_be_frosen: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class FreezeConfirmResult:
+    success: bool
+    message: str | None = None
+    service_name: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -126,6 +141,7 @@ async def get_customer_gym_service_info(
             date_from=_optional_str(data.get("date_from")),
             date_to=_optional_str(data.get("date_to")),
             lefted_visits_amount=_optional_int(data.get("lefted_visits_amount")),
+            can_be_frosen=bool(data.get("can_be_frosen")),
         )
     except Exception:
         logger.exception(
@@ -134,6 +150,86 @@ async def get_customer_gym_service_info(
             service_id,
         )
         return None
+
+
+async def get_freeze_preview(telegram_id: int, service_id: int) -> FreezePreview | None:
+    url = settings.external_api_base_url.rstrip("/") + "/api/gym-freeze-preview"
+    try:
+        async with httpx.AsyncClient(timeout=settings.external_api_timeout_sec) as client:
+            logger.info(
+                "Calling freeze preview: %s telegram_id=%s service_id=%s",
+                url,
+                telegram_id,
+                service_id,
+            )
+            r = await client.get(url, params={"telegram_id": telegram_id, "service_id": service_id})
+            r.raise_for_status()
+            payload: Any = r.json()
+
+        if not isinstance(payload, dict) or payload.get("success") is False:
+            logger.info("Freeze preview failed: %s", payload)
+            return None
+
+        data = payload.get("data")
+        if not isinstance(data, dict):
+            return None
+
+        service_name = _optional_str(data.get("service_name"))
+        if not service_name:
+            return None
+
+        raw_rules = data.get("rules")
+        rules: list[str] = []
+        if isinstance(raw_rules, list):
+            for item in raw_rules:
+                text = _optional_str(item)
+                if text:
+                    rules.append(text)
+
+        return FreezePreview(
+            service_name=service_name,
+            rules=tuple(rules),
+            can_be_frosen=bool(data.get("can_be_frosen")),
+        )
+    except Exception:
+        logger.exception(
+            "Failed to fetch freeze preview telegram_id=%s service_id=%s",
+            telegram_id,
+            service_id,
+        )
+        return None
+
+
+async def confirm_freeze(telegram_id: int, service_id: int) -> FreezeConfirmResult:
+    url = settings.external_api_base_url.rstrip("/") + "/api/gym-freeze-confirm"
+    try:
+        async with httpx.AsyncClient(timeout=settings.external_api_timeout_sec) as client:
+            logger.info(
+                "Calling freeze confirm: %s telegram_id=%s service_id=%s",
+                url,
+                telegram_id,
+                service_id,
+            )
+            r = await client.get(url, params={"telegram_id": telegram_id, "service_id": service_id})
+            try:
+                payload: Any = r.json()
+            except Exception:
+                payload = None
+
+        if isinstance(payload, dict) and payload.get("success") is False:
+            return FreezeConfirmResult(success=False, message=_optional_str(payload.get("message")))
+
+        if not r.is_success or not isinstance(payload, dict):
+            return FreezeConfirmResult(success=False, message="Не вдалося заморозити абонемент.")
+
+        return FreezeConfirmResult(success=True, message=_optional_str(payload.get("message")))
+    except Exception:
+        logger.exception(
+            "Failed to confirm freeze telegram_id=%s service_id=%s",
+            telegram_id,
+            service_id,
+        )
+        return FreezeConfirmResult(success=False, message="Не вдалося заморозити абонемент.")
 
 
 async def start_visit(telegram_id: int, service_id: int) -> StartVisitResult:
