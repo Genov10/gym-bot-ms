@@ -13,7 +13,7 @@ SEX_FEMALE_TEXT = "Жінка"
 
 START_TEXT = "Почати"
 CATALOG_TEXT = "Каталог"
-MY_WORKOUTS_TEXT = "Мої тренування"
+MY_WORKOUTS_TEXT = "Мої абонементи"
 
 # Reply-кнопки головного меню — не обробляти їх як кроки реєстрації (FSM).
 MENU_BUTTON_TEXTS: frozenset[str] = frozenset(
