@@ -105,9 +105,6 @@ async def cmd_start(message: Message, state: FSMContext, api: ExternalApiClient)
             )
             async with async_session_factory() as session:
                 await delete_by_telegram_id(session, telegram_id=u.id)
-            await message.answer(
-                "Реєстрацію не завершено на сервері залу. Пройдіть реєстрацію ще раз."
-            )
             from app.handlers.start_registration import begin_register
 
             await begin_register(message, state)
