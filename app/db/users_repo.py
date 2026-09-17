@@ -110,6 +110,15 @@ async def clear_active_visit_if_expired(session: AsyncSession, *, telegram_id: i
         await session.commit()
 
 
+async def delete_by_telegram_id(session: AsyncSession, *, telegram_id: int) -> bool:
+    user = await get_by_telegram_id(session, telegram_id)
+    if user is None:
+        return False
+    await session.delete(user)
+    await session.commit()
+    return True
+
+
 async def list_menu_targets(session: AsyncSession) -> list[tuple[int, bool]]:
     """Return (telegram_id, is_registered) for all users that can receive a menu refresh."""
     r = await session.execute(select(User.telegram_id, User.is_verified))

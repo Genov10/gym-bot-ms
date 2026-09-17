@@ -136,7 +136,7 @@ async def _finish_registration(message: Message, state: FSMContext, *, email: st
     await send_menu(message, "Спробуйте реєстрацію ще раз через «Почати».", telegram_id=message.from_user.id)
 
 
-async def _begin_register(message: Message, state: FSMContext) -> None:
+async def begin_register(message: Message, state: FSMContext) -> None:
     await state.clear()
     kb = ReplyKeyboardMarkup(
         keyboard=[[KeyboardButton(text="📱 Поділитися номером", request_contact=True)]],
@@ -150,13 +150,13 @@ async def _begin_register(message: Message, state: FSMContext) -> None:
 
 @router.message(F.text == START_TEXT)
 async def action_register_from_menu(message: Message, state: FSMContext) -> None:
-    await _begin_register(message, state)
+    await begin_register(message, state)
 
 
 @router.callback_query(F.data == "action:register")
 async def action_register(callback: CallbackQuery, state: FSMContext) -> None:
     await callback.answer()
-    await _begin_register(callback.message, state)
+    await begin_register(callback.message, state)
 
 
 @router.message(RegisterFlow.contact, F.contact)

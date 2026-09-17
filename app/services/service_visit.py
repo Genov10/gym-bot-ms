@@ -53,6 +53,55 @@ TOO_MANY_UNFINISHED_VISITS_CODE = 15
 TOO_MANY_UNFINISHED_VISITS_MESSAGE = (
     "Ви намагались зайти до залу більше трьох разів. Зверніться до адміністратора"
 )
+CUSTOMER_NOT_FOUND_CODE = 4
+
+
+@dataclass(frozen=True, slots=True)
+class CustomerPresenceResult:
+    """exists=None means check failed (network/unexpected) — do not wipe local user."""
+    exists: bool | None
+    code: int | None = None
+    message: str | None = None
+
+
+async def check_customer_exists(telegram_id: int) -> CustomerPresenceResult:
+    """Check whether customer exists on gym-core via gym-get-customer-gym-services."""
+    url = settings.external_api_base_url.rstrip("/") + "/api/gym-get-customer-gym-services"
+    try:
+        async with httpx.AsyncClient(timeout=settings.external_api_timeout_sec) as client:
+            logger.info("Checking customer presence: %s telegram_id=%s", url, telegram_id)
+            r = await client.get(url, params={"telegram_id": telegram_id})
+            try:
+                payload: Any = r.json()
+            except Exception:
+                payload = None
+
+        if isinstance(payload, dict) and payload.get("success") is False:
+            code = payload.get("code")
+            code_int = code if isinstance(code, int) else None
+            if code_int == CUSTOMER_NOT_FOUND_CODE:
+                return CustomerPresenceResult(
+                    exists=False,
+                    code=code_int,
+                    message=_optional_str(payload.get("message")),
+                )
+            # Other business errors: customer may still exist — do not treat as missing.
+            return CustomerPresenceResult(
+                exists=True,
+                code=code_int,
+                message=_optional_str(payload.get("message")),
+            )
+
+        if not r.is_success:
+            return CustomerPresenceResult(exists=None, message="HTTP error")
+
+        if not isinstance(payload, dict):
+            return CustomerPresenceResult(exists=None, message="Unexpected response")
+
+        return CustomerPresenceResult(exists=True)
+    except Exception:
+        logger.exception("Failed to check customer presence telegram_id=%s", telegram_id)
+        return CustomerPresenceResult(exists=None, message="Request failed")
 
 
 async def get_service_visit(telegram_id: int) -> list[CustomerGymService] | None:

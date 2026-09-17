@@ -9,6 +9,7 @@ from aiogram.types import ChatMemberUpdated, Message
 
 from app.db.session import async_session_factory
 from app.db.users_repo import (
+    delete_by_telegram_id,
     get_by_telegram_id,
     heal_legacy_verified,
     register_or_update,
@@ -20,6 +21,7 @@ from app.handlers.start_common import (
     menu_kb,
 )
 from app.services.external_api import ExternalApiClient
+from app.services.service_visit import check_customer_exists
 
 logger = logging.getLogger(__name__)
 router = Router(name="start_menu")
@@ -89,6 +91,28 @@ async def cmd_start(message: Message, state: FSMContext, api: ExternalApiClient)
         return
 
     u = message.from_user
+
+    async with async_session_factory() as session:
+        existing = await get_by_telegram_id(session, u.id)
+
+    # Если пользователь уже есть в БД бота — сверяем с основным сервером.
+    if existing is not None:
+        presence = await check_customer_exists(u.id)
+        if presence.exists is False:
+            logger.info(
+                "Core customer missing for bot user telegram_id=%s; resetting local registration",
+                u.id,
+            )
+            async with async_session_factory() as session:
+                await delete_by_telegram_id(session, telegram_id=u.id)
+            await message.answer(
+                "Реєстрацію не завершено на сервері залу. Пройдіть реєстрацію ще раз."
+            )
+            from app.handlers.start_registration import begin_register
+
+            await begin_register(message, state)
+            return
+
     async with async_session_factory() as session:
         user = await register_or_update(
             session,
