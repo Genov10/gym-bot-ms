@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import logging
 
-from aiogram import F, Router
-from aiogram.filters import Command, CommandStart
+from aiogram import Bot, F, Router
+from aiogram.filters import IS_MEMBER, IS_NOT_MEMBER, ChatMemberUpdatedFilter, Command, CommandStart
 from aiogram.fsm.context import FSMContext
-from aiogram.types import Message
+from aiogram.types import ChatMemberUpdated, Message
 
 from app.db.session import async_session_factory
 from app.db.users_repo import (
@@ -24,6 +24,28 @@ from app.services.external_api import ExternalApiClient
 logger = logging.getLogger(__name__)
 router = Router(name="start_menu")
 
+WELCOME_BACK_TEXT = "З поверненням! Оберіть дію нижче."
+
+
+async def resolve_registered(*, telegram_id: int, is_registered: bool | None = None) -> bool:
+    async with async_session_factory() as session:
+        if is_registered is None:
+            await heal_legacy_verified(session, telegram_id=telegram_id)
+        user = await get_by_telegram_id(session, telegram_id)
+        return is_registered if is_registered is not None else (user is not None and user.is_verified)
+
+
+async def send_menu_to_chat(
+    bot: Bot,
+    *,
+    chat_id: int,
+    telegram_id: int,
+    text: str,
+    is_registered: bool | None = None,
+) -> None:
+    registered = await resolve_registered(telegram_id=telegram_id, is_registered=is_registered)
+    await bot.send_message(chat_id, text, reply_markup=menu_kb(is_registered=registered))
+
 
 async def send_menu(
     message: Message,
@@ -37,14 +59,27 @@ async def send_menu(
             return
         telegram_id = message.from_user.id
 
-    async with async_session_factory() as session:
-        if is_registered is None:
-            await heal_legacy_verified(session, telegram_id=telegram_id)
-        user = await get_by_telegram_id(session, telegram_id)
-        registered = is_registered if is_registered is not None else (user is not None and user.is_verified)
-
+    registered = await resolve_registered(telegram_id=telegram_id, is_registered=is_registered)
     await message.answer(text, reply_markup=menu_kb(is_registered=registered))
-    # оставляем HOME кнопку как отдельную reply-клавиатуру только если нужно явно
+
+
+@router.my_chat_member(ChatMemberUpdatedFilter(IS_NOT_MEMBER >> IS_MEMBER))
+async def on_bot_readded(event: ChatMemberUpdated, bot: Bot) -> None:
+    """Користувач розблокував / знову додав бота — одразу відновлюємо меню без /start."""
+    user = event.from_user
+    if user is None:
+        return
+
+    logger.info("Bot re-added/unblocked by telegram_id=%s", user.id)
+    try:
+        await send_menu_to_chat(
+            bot,
+            chat_id=event.chat.id,
+            telegram_id=user.id,
+            text=WELCOME_BACK_TEXT,
+        )
+    except Exception:
+        logger.exception("Failed to restore menu after re-add telegram_id=%s", user.id)
 
 
 @router.message(CommandStart())
@@ -99,4 +134,3 @@ async def admin_contact(message: Message) -> None:
         "Натисніть кнопку нижче, щоб відкрити чат з адміністратором:",
         reply_markup=admin_contact_inline_kb(),
     )
-

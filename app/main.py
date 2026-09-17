@@ -46,7 +46,7 @@ async def main() -> None:
     try:
         await bot.delete_webhook(drop_pending_updates=False)
         logger.info("Webhook deleted (if any); starting long polling")
-        await dp.start_polling(bot)
+        await dp.start_polling(bot, allowed_updates=["message", "callback_query", "my_chat_member"])
     finally:
         http_server.should_exit = True
         try:
