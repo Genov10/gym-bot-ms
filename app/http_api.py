@@ -22,8 +22,6 @@ from app.telegram_sensitive import PROTECT_CONTENT_KWARGS
 
 logger = logging.getLogger(__name__)
 
-MENU_REFRESH_TEXT = "\u200b"  # zero-width space: оновити reply-клавіатуру без видимого тексту
-
 
 class PaymentResultRequest(BaseModel):
     telegram_id: int = Field(..., ge=1)
@@ -156,7 +154,11 @@ def create_http_app(*, bot: Bot) -> FastAPI:
 
     @app.post("/refresh-menu", response_model=BroadcastResponse)
     async def refresh_menu() -> BroadcastResponse:
-        """Примусово надіслати актуальну reply-клавіатуру всім користувачам з БД бота."""
+        """Оновити reply-клавіатуру всім користувачам без залишку повідомлення в чаті.
+
+        Бот не може виконати /start від імені користувача. Тому шлемо службове
+        повідомлення з актуальною клавіатурою і одразу видаляємо його — кнопки лишаються.
+        """
         async with async_session_factory() as session:
             targets = await list_menu_targets(session)
 
@@ -166,17 +168,23 @@ def create_http_app(*, bot: Bot) -> FastAPI:
 
         for telegram_id, is_verified in targets:
             try:
-                await bot.send_message(
-                    telegram_id,
-                    MENU_REFRESH_TEXT,
+                msg = await bot.send_message(
+                    chat_id=telegram_id,
+                    text=".",
                     reply_markup=menu_kb(is_registered=is_verified),
                 )
+                try:
+                    await bot.delete_message(chat_id=telegram_id, message_id=msg.message_id)
+                except Exception:
+                    logger.exception(
+                        "Menu refreshed but failed to delete temp message telegram_id=%s",
+                        telegram_id,
+                    )
                 sent += 1
             except Exception as e:
                 failed += 1
                 logger.exception("Failed to refresh menu telegram_id=%s", telegram_id)
                 errors.append({"telegram_id": telegram_id, "error": str(e)})
-            # невелика пауза, щоб не впертися в Telegram rate limit
             await asyncio.sleep(0.05)
 
         return BroadcastResponse(total=len(targets), sent=sent, failed=failed, errors=errors)
