@@ -17,6 +17,7 @@ import segno
 
 from app.config import settings
 from app.handlers.start_common import MY_WORKOUTS_TEXT, menu_kb
+from app.services.order import create_order
 from app.services.service_visit import (
     CustomerGymServiceInfo,
     confirm_freeze,
@@ -35,6 +36,8 @@ FREEZE_BUTTON_TEXT = "Заморозити абонемент"
 FREEZE_CONFIRM_BUTTON_TEXT = "Так, я хочу його заморозити"
 EXTEND_BUTTON_TEXT = "Продовження на 2 тиждні"
 EXTEND_PAY_BUTTON_TEXT = "Оплатити продовження"
+DISCOUNT_RENEW_BUTTON_TEXT = "Оформити наступний абонемент зі знижкою"
+DISCOUNT_PAY_BUTTON_TEXT = "Оплатити"
 
 
 def _format_service_info_message(info: CustomerGymServiceInfo) -> str:
@@ -176,6 +179,15 @@ async def customer_service_chosen(callback: CallbackQuery) -> None:
                 )
             ]
         )
+    if info.can_buy_with_discount:
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    text=DISCOUNT_RENEW_BUTTON_TEXT,
+                    callback_data=f"discount_renew:{service_id}",
+                )
+            ]
+        )
 
     kb = InlineKeyboardMarkup(inline_keyboard=rows)
     await callback.message.answer(_format_service_info_message(info), reply_markup=kb)
@@ -280,6 +292,59 @@ async def extend_service_chosen(callback: CallbackQuery) -> None:
     kb = InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(text=EXTEND_PAY_BUTTON_TEXT, url=result.url)]
+        ]
+    )
+    await callback.message.answer(text, reply_markup=kb)
+
+
+def _format_discount_order_price(*, price: int, sale_from: int | None) -> str:
+    if sale_from is not None and sale_from != price:
+        return f"<s>{sale_from}</s> {price}"
+    return str(price)
+
+
+@router.callback_query(F.data.startswith("discount_renew:"))
+async def discount_renew_chosen(callback: CallbackQuery) -> None:
+    if callback.data is None:
+        return
+    service_id = int(callback.data.split("discount_renew:", 1)[1])
+    await callback.answer()
+    if callback.from_user is None or callback.message is None:
+        return
+
+    order_result = await create_order(
+        telegram_id=callback.from_user.id,
+        service_id=service_id,
+    )
+    if not order_result.success or not order_result.payment_url:
+        await callback.message.answer(
+            order_result.message or "Не вдалося створити замовлення зі знижкою."
+        )
+        return
+
+    data = order_result.data or {}
+    name = str(data.get("name") or "Абонемент")
+    price_raw = data.get("price")
+    sale_from_raw = data.get("sale_from")
+    try:
+        price = int(price_raw)
+    except (TypeError, ValueError):
+        await callback.message.answer("Не вдалося прочитати ціну замовлення.")
+        return
+
+    sale_from: int | None
+    try:
+        sale_from = int(sale_from_raw) if sale_from_raw is not None else None
+    except (TypeError, ValueError):
+        sale_from = None
+
+    text = (
+        f"<b>{html.escape(name)}</b>\n"
+        f"Ціна: {_format_discount_order_price(price=price, sale_from=sale_from)}"
+    )
+    kb = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text=DISCOUNT_PAY_BUTTON_TEXT, url=order_result.payment_url)]
         ]
     )
     await callback.message.answer(text, reply_markup=kb)

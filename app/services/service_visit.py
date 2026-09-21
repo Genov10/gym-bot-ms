@@ -26,6 +26,7 @@ class CustomerGymServiceInfo:
     lefted_visits_amount: int | None = None
     can_be_frosen: bool = False
     can_be_extended: bool = False
+    can_buy_with_discount: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -203,6 +204,7 @@ async def get_customer_gym_service_info(
             lefted_visits_amount=_optional_int(data.get("lefted_visits_amount")),
             can_be_frosen=bool(data.get("can_be_frosen")),
             can_be_extended=bool(data.get("can_be_extended")),
+            can_buy_with_discount=bool(data.get("can_buy_with_discount")),
         )
     except Exception:
         logger.exception(
