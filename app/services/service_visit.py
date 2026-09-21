@@ -25,6 +25,17 @@ class CustomerGymServiceInfo:
     date_to: str | None = None
     lefted_visits_amount: int | None = None
     can_be_frosen: bool = False
+    can_be_extended: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class ExtendPaymentResult:
+    success: bool
+    message: str | None = None
+    price: int | None = None
+    extend_days: int | None = None
+    url: str | None = None
+    order_reference: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -191,6 +202,7 @@ async def get_customer_gym_service_info(
             date_to=_optional_str(data.get("date_to")),
             lefted_visits_amount=_optional_int(data.get("lefted_visits_amount")),
             can_be_frosen=bool(data.get("can_be_frosen")),
+            can_be_extended=bool(data.get("can_be_extended")),
         )
     except Exception:
         logger.exception(
@@ -199,6 +211,55 @@ async def get_customer_gym_service_info(
             service_id,
         )
         return None
+
+
+async def get_extend_payment(telegram_id: int, service_id: int) -> ExtendPaymentResult:
+    url = settings.external_api_base_url.rstrip("/") + "/api/gym-get-customer-gym-service-extend"
+    try:
+        async with httpx.AsyncClient(timeout=settings.external_api_timeout_sec) as client:
+            logger.info(
+                "Calling service extend: %s telegram_id=%s service_id=%s",
+                url,
+                telegram_id,
+                service_id,
+            )
+            r = await client.get(url, params={"telegram_id": telegram_id, "service_id": service_id})
+            try:
+                payload: Any = r.json()
+            except Exception:
+                payload = None
+
+        if isinstance(payload, dict) and payload.get("success") is False:
+            return ExtendPaymentResult(success=False, message=_optional_str(payload.get("message")))
+
+        if not r.is_success or not isinstance(payload, dict):
+            return ExtendPaymentResult(success=False, message="Не вдалося створити посилання на оплату.")
+
+        data = payload.get("data")
+        if not isinstance(data, dict):
+            return ExtendPaymentResult(success=False, message="Неочікувана відповідь сервера.")
+
+        payment_url = _optional_str(data.get("url"))
+        price = _optional_int(data.get("price"))
+        extend_days = _optional_int(data.get("extend_days"))
+        if not payment_url or price is None or extend_days is None:
+            return ExtendPaymentResult(success=False, message="Неповні дані для продовження абонемента.")
+
+        return ExtendPaymentResult(
+            success=True,
+            message=_optional_str(payload.get("message")),
+            price=price,
+            extend_days=extend_days,
+            url=payment_url,
+            order_reference=_optional_str(data.get("orderReference")),
+        )
+    except Exception:
+        logger.exception(
+            "Failed to get extend payment telegram_id=%s service_id=%s",
+            telegram_id,
+            service_id,
+        )
+        return ExtendPaymentResult(success=False, message="Не вдалося створити посилання на оплату.")
 
 
 async def get_freeze_preview(telegram_id: int, service_id: int) -> FreezePreview | None:

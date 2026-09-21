@@ -21,6 +21,7 @@ from app.services.service_visit import (
     CustomerGymServiceInfo,
     confirm_freeze,
     get_customer_gym_service_info,
+    get_extend_payment,
     get_freeze_preview,
     get_service_visit,
     start_visit,
@@ -32,6 +33,8 @@ router = Router(name="start_visit")
 START_TRAINING_BUTTON_TEXT = "Отримати QR-код та почати тренування"
 FREEZE_BUTTON_TEXT = "Заморозити абонемент"
 FREEZE_CONFIRM_BUTTON_TEXT = "Так, я хочу його заморозити"
+EXTEND_BUTTON_TEXT = "Продовження на 2 тиждні"
+EXTEND_PAY_BUTTON_TEXT = "Оплатити продовження"
 
 
 def _format_service_info_message(info: CustomerGymServiceInfo) -> str:
@@ -164,6 +167,15 @@ async def customer_service_chosen(callback: CallbackQuery) -> None:
                 )
             ]
         )
+    if info.can_be_extended:
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    text=EXTEND_BUTTON_TEXT,
+                    callback_data=f"extend_service:{service_id}",
+                )
+            ]
+        )
 
     kb = InlineKeyboardMarkup(inline_keyboard=rows)
     await callback.message.answer(_format_service_info_message(info), reply_markup=kb)
@@ -242,3 +254,32 @@ async def freeze_confirm_chosen(callback: CallbackQuery) -> None:
     info = await get_customer_gym_service_info(telegram_id=telegram_id, service_id=service_id)
     name = info.service_name if info is not None else "Абонемент"
     await callback.message.answer(f"<b>{html.escape(name)}</b> успішно заморожено")
+
+
+@router.callback_query(F.data.startswith("extend_service:"))
+async def extend_service_chosen(callback: CallbackQuery) -> None:
+    if callback.data is None:
+        return
+    service_id = int(callback.data.split("extend_service:", 1)[1])
+    await callback.answer()
+    if callback.from_user is None or callback.message is None:
+        return
+
+    result = await get_extend_payment(
+        telegram_id=callback.from_user.id,
+        service_id=service_id,
+    )
+    if not result.success or not result.url or result.extend_days is None or result.price is None:
+        await callback.message.answer(result.message or "Не вдалося створити посилання на оплату.")
+        return
+
+    text = (
+        f"Ви можете продовжити свій абонемент на {result.extend_days} днів\n"
+        f"Ціна {result.price}"
+    )
+    kb = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text=EXTEND_PAY_BUTTON_TEXT, url=result.url)]
+        ]
+    )
+    await callback.message.answer(text, reply_markup=kb)
